@@ -4,6 +4,8 @@
 
 To run the model with `llama-cpp-python` in GGUF format, select a GGUF backbone when intializing the example script.
 
+All examples now default to automatic device selection: CUDA (or DirectML/MPS where supported) is used when available, with a safe fallback to CPU.
+
 ```bash
 python -m examples.basic_example \
   --input_text "My name is Andy. I'm 25 and I just moved to London. The underground is pretty confusing, but it gets me around in no time at all." \
@@ -29,7 +31,7 @@ Note that `basic_streaming_example.py` requires a pre-encoded reference. `basic_
 To take advantage of encoding references ahead of time, we have a compiled the codec decoder into an [onnx graph](https://huggingface.co/neuphonic/neucodec-onnx-decoder) that enables inferencing NeuTTS without loading the encoder.
 This can be useful for running the model in resource-constrained environments where the encoder may add a large amount of extra latency/memory usage.
 
-To test the decoder, make sure you have installed ```onnxruntime``` and run the following:
+To test the decoder, install the appropriate ONNX Runtime build (e.g. `onnxruntime` for CPU or `onnxruntime-gpu` for CUDA) and run one of the following:
 
 ```bash
 python -m examples.basic_example \
@@ -40,7 +42,22 @@ python -m examples.basic_example \
   --codec neuphonic/neucodec-onnx-decoder
 ```
 
+<<<<<<< HEAD
 Since the onnx codec is decoder-only, this requires the pre-encoded reference (e.g. `samples/jo.pt`) to already exist alongside the wav.
+=======
+```bash
+python -m examples.onnx_example_gpu \
+  --input_text "My name is Dave, and um, I'm from London" \
+  --ref_codes samples/dave.pt \
+  --ref_text samples/dave.txt \
+  --backbone neuphonic/neutts-air-q4-gguf \
+  --codec_device cuda
+```
+
+Set `--codec_device` to `auto` (default) to pick the first available GPU provider with an automatic CPU fallback. Use `cuda`/`cuda:0` (or `directml`, `rocm`) to request a specific provider—each will still fall back to CPU if unavailable. Pass `cpu` to disable GPU execution entirely.
+
+### Streaming Support 
+>>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
 
 ### Streaming Support
 

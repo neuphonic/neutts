@@ -24,10 +24,15 @@ def main(
     # Initialize NeuTTS with the desired model and codec
     tts = NeuTTS(
         backbone_repo=backbone,
+<<<<<<< HEAD
         backbone_device=device,
         codec_repo=codec,
         codec_device=codec_device,
         seed=seed,
+=======
+        codec_repo="neuphonic/neucodec",
+        codec_device="auto"
+>>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
     )
 
     # Check if ref_text is a path if it is read it if not just return string

@@ -158,9 +158,40 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    #### Looking for GPU Support?
    If you have a dedicated GPU (Nvidia/CUDA, AMD/ROCm, M-Series Mac/Metal) and want to utilize it instead of the CPU, the CMAKE flags will be different.Please refer to the official [llama-cpp-python documentation](https://github.com/abetlen/llama-cpp-python/blob/main/README.md) for the exact flags required for your specific hardware.
 
+<<<<<<< HEAD
 3. **(Optional) Install `onnxruntime` to use the `.onnx` decoder.**
    ```bash
    pip install "neutts[onnx]"
+=======
+   The requirements file includes the dependencies needed to run the model with PyTorch.
+   When using an ONNX decoder or a GGML model, some dependencies (such as PyTorch) are no longer required.
+
+   The inference is compatible and tested on `python>=3.11`.
+
+    ```
+    pip install -r requirements.txt
+    ```
+
+4. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
+   ```
+   pip install llama-cpp-python
+   ```
+   To run llama-cpp with GPU suport (CUDA, MPS) support please refer to:
+   https://pypi.org/project/llama-cpp-python/
+
+5. **(Optional) Install ONNX Runtime to use the `.onnx` decoder.**
+   Choose the build that matches the execution provider you want to use:
+
+   ```bash
+   # CPU-only runtime
+   pip install onnxruntime
+
+   # CUDA-enabled runtime (NVIDIA GPUs)
+   pip install onnxruntime-gpu
+
+   # DirectML runtime (Windows GPUs)
+   pip install onnxruntime-directml
+>>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
    ```
 
 ## Examples
@@ -195,11 +226,16 @@ To specify a particular model repo for the backbone or codec, add the `--backbon
 from neutts import NeuTTS
 import soundfile as sf
 
+<<<<<<< HEAD
 tts = NeuTTS(
    backbone_repo="neuphonic/neutts-nano", # or 'neuphonic/neutts-nano-q4-gguf' with llama-cpp-python installed
    backbone_device="cpu",
+=======
+tts = NeuTTSAir(
+   backbone_repo="neuphonic/neutts-air", # or 'neutts-air-q4-gguf' with llama-cpp-python installed
+>>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
    codec_repo="neuphonic/neucodec",
-   codec_device="cpu"
+   codec_device="auto"  # 'auto', 'cpu', 'cuda', 'cuda:0', 'directml', 'rocm', ...
 )
 input_text = "My name is Andy. I'm 25 and I just moved to London. The underground is pretty confusing, but it gets me around in no time at all."
 
@@ -213,6 +249,7 @@ wav = tts.infer(input_text, ref_codes, ref_text)
 sf.write("test.wav", wav, 24000)
 ```
 
+<<<<<<< HEAD
 ### Streaming
 
 Speech can also be synthesised in _streaming mode_, where audio is generated in chunks and plays as generated. The streaming example scripts use `pyaudio` for playback, which needs the PortAudio library on macOS and Linux:
@@ -266,6 +303,15 @@ Streaming works the same way via `examples.basic_streaming_example_emotions`, wh
 ### Reproducibility
 
 Generation is sampled, and every call prints the seed it used. With no seed set, each call draws a fresh random seed, so repeated calls give different takes — to recover a take you liked, rerun with its printed seed. Passing `seed` to `NeuTTS`/`NeuTTS2E` (or `--seed` to the examples) pins it: the same inputs and seed always produce identical audio, on both the PyTorch and GGUF backbones, batch or streaming.
+=======
+`backbone_device` now defaults to `"auto"`, which prefers CUDA (or Apple MPS) when available and falls back to CPU otherwise. Override it manually if you need to pin the backbone to a specific device (e.g. `"cpu"` or `"cuda:1"`).
+
+`codec_device` follows similar rules for the ONNX decoder:
+
+- omit the argument or set `"auto"` to choose the first available GPU execution provider and transparently fall back to CPU if none are detected;
+- set `"cuda"`, `"cuda:<index>"`, `"directml"`, or `"rocm"` to prefer that GPU provider while still falling back to CPU when the provider is missing;
+- set `"cpu"` to keep the decoder on the CPU exclusively.
+>>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
 
 ## Preparing References for Cloning
 
