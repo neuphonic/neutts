@@ -313,6 +313,52 @@ Generation is sampled, and every call prints the seed it used. With no seed set,
 - set `"cpu"` to keep the decoder on the CPU exclusively.
 >>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
 
+## Benchmarking ONNX providers
+
+You can profile the available ONNX Runtime execution providers with the benchmarking helper:
+
+```bash
+python -m examples.provider_benchmark \
+   --input_text "Benchmarking NeuTTS Air" \
+   --ref_codes samples/dave.pt \
+   --ref_text samples/dave.txt \
+   --runs 3 \
+   --output benchmark_results.json
+```
+
+The script automatically discovers reachable providers (CUDA, ROCm, DirectML and CPU), synthesises speech for each, and reports:
+
+- model load time, inference time, and total wall-clock time;
+- real-time factor (RTF = inference time ÷ audio duration);
+- host RAM deltas and CUDA VRAM peaks (when applicable);
+- the concrete provider order applied by ONNX Runtime.
+
+Raw run data and aggregated statistics are saved to JSON when `--output` is provided. Use `--verbose` to see per-run metrics in the console. Add `--summary_output benchmark.txt` to persist the rendered table and detected system hardware in plain text.
+
+Models are now instantiated once per device during benchmarking and reused for the measured runs. A single warm-up pass is executed by default before timings are recorded; customise this with `--warmup_runs`, or opt back into the legacy behaviour (fresh load per run) with `--no_reuse`.
+
+The console output includes your system metadata above the table so you can attribute results to a specific machine.
+
+The column values are reported as `mean ± standard deviation` across the configured runs.
+
+Pass `--backbone_devices cpu,cuda` (or any comma-separated list) to benchmark the cross-product of backbone and codec execution targets—the resulting table reports both placements per row. You can also provide multiple repositories at once. For example, to compare the torch checkpoint with both GGUF variants (Q4 and Q8) across CPU/CUDA combinations:
+
+```bash
+python -m examples.provider_benchmark \
+   --input_text "Benchmarking NeuTTS Air combos" \
+   --ref_codes samples/dave.pt \
+   --ref_text samples/dave.txt \
+   --backbone_repos neuphonic/neutts-air,neuphonic/neutts-air-q4-gguf,neuphonic/neutts-air-q8-gguf \
+   --backbone_devices cpu,cuda \
+   --codec_devices cpu,cuda \
+   --runs 3 \
+   --warmup_runs 1 \
+   --output gguf_comparison.json \
+   --summary_output gguf_comparison.txt
+```
+
+Add `--codec_repos` if you want to include custom decoder builds alongside `neucodec-onnx-decoder` in the same sweep.
+
 ## Preparing References for Cloning
 
 NeuTTS requires two inputs:

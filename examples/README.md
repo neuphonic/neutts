@@ -2,17 +2,59 @@
 
 ### GGUF Backbones
 
-To run the model with `llama-cpp-python` in GGUF format, select a GGUF backbone when intializing the example script.
-
-All examples now default to automatic device selection: CUDA (or DirectML/MPS where supported) is used when available, with a safe fallback to CPU.
+To run the model with `llama-cpp-python` in GGUF format, select a GGUF backbone when initialising the example script. All examples default to automatic device selection: CUDA (or DirectML/MPS where available) is chosen when possible, otherwise the CPU fallback is used.
 
 ```bash
 python -m examples.basic_example \
+<<<<<<< HEAD
   --input_text "My name is Andy. I'm 25 and I just moved to London. The underground is pretty confusing, but it gets me around in no time at all." \
   --ref_audio ./samples/jo.wav \
   --ref_text ./samples/jo.txt \
   --backbone neuphonic/neutts-nano-q4-gguf
+=======
+  --input_text "My name is Dave, and um, I'm from London" \
+  --ref_audio ./samples/dave.wav \
+  --ref_text ./samples/dave.txt \
+  --backbone neuphonic/neutts-air-q4-gguf \
+  --backbone_device auto \
+  --codec_device auto
+>>>>>>> ad81e78 (Enhance benchmarking capabilities and device selection in examples)
 ```
+
+### Provider Benchmark
+
+Benchmark the available ONNX Runtime execution providers and summarise their performance:
+
+```bash
+python -m examples.provider_benchmark \
+  --input_text "Benchmarking NeuTTS Air" \
+  --ref_codes samples/dave.pt \
+  --ref_text samples/dave.txt \
+  --runs 3 \
+  --warmup_runs 1 \
+  --output benchmark_results.json \
+  --summary_output benchmark_summary.txt
+```
+
+Add `--verbose` for per-run stats. `--summary_output` captures the rendered table and hardware information.
+
+Set `--backbone_devices cpu,cuda` to measure both placements of a single backbone. Combine that with `--backbone_repos` to sweep multiple checkpoints in one pass. For example, the command below compares the torch checkpoint with the Q4 and Q8 GGUF exports across CPU/CUDA combinations for both the backbone and codec:
+
+```bash
+python -m examples.provider_benchmark \
+  --input_text "Benchmarking NeuTTS Air combos" \
+  --ref_codes samples/dave.pt \
+  --ref_text samples/dave.txt \
+  --backbone_repos neuphonic/neutts-air,neuphonic/neutts-air-q4-gguf,neuphonic/neutts-air-q8-gguf \
+  --backbone_devices cpu,cuda \
+  --codec_devices cpu,cuda \
+  --runs 3 \
+  --warmup_runs 1 \
+  --output gguf_comparison.json \
+  --summary_output gguf_comparison.txt
+```
+
+Use `--codec_repos` if you need to include additional decoder builds alongside `neucodec-onnx-decoder`. Each device is instantiated once and a warm-up pass (configurable via `--warmup_runs`) is executed before measurements start. Add `--no_reuse` to revert to the legacy behaviour that reloads models for every run.
 
 ### Pre-encode a reference
 
