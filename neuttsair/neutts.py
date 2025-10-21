@@ -51,7 +51,7 @@ class NeuTTSAir:
 
         # Consts
         self.sample_rate = 24_000
-        self.max_context = 2048
+        self.max_context = 32768
         self.hop_length = 480
         self.streaming_overlap_frames = 1
         self.streaming_frames_per_chunk = 25
