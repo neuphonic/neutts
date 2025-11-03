@@ -97,6 +97,12 @@ def candidate_codec_devices(
     if "DmlExecutionProvider" in available:
         devices.append("directml")
 
+    # Apple Silicon / macOS ONNX providers
+    if "MetalExecutionProvider" in available:
+        devices.append("metal")
+    if "CoreMLExecutionProvider" in available:
+        devices.append("coreml")
+
     devices.append("cpu")
 
     # Deduplicate while preserving order

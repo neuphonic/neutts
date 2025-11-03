@@ -265,6 +265,8 @@ class NeuTTSAir:
             "CUDAExecutionProvider",
             "ROCMExecutionProvider",
             "DmlExecutionProvider",
+            "MetalExecutionProvider",
+            "CoreMLExecutionProvider",
         ]
 
         if normalized_device == "cpu":
@@ -290,6 +292,30 @@ class NeuTTSAir:
             else:
                 warnings.warn(
                     "DmlExecutionProvider unavailable; falling back to CPUExecutionProvider.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                add_provider("CPUExecutionProvider")
+        elif normalized_device in {"metal"}:
+            provider_name = "MetalExecutionProvider"
+            if provider_name in available:
+                add_provider(provider_name)
+                add_provider("CPUExecutionProvider")
+            else:
+                warnings.warn(
+                    "MetalExecutionProvider unavailable; falling back to CPUExecutionProvider.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                add_provider("CPUExecutionProvider")
+        elif normalized_device in {"coreml"}:
+            provider_name = "CoreMLExecutionProvider"
+            if provider_name in available:
+                add_provider(provider_name)
+                add_provider("CPUExecutionProvider")
+            else:
+                warnings.warn(
+                    "CoreMLExecutionProvider unavailable; falling back to CPUExecutionProvider.",
                     RuntimeWarning,
                     stacklevel=2,
                 )
