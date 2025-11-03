@@ -27,7 +27,7 @@ State-of-the-art Voice AI has been locked behind web APIs for too long. NeuTTS i
 - 🚄Simple LM + codec architecture - making development and deployment simple
 
 > [!CAUTION]
-> Websites like neutts.com are popping up and they're not affliated with Neuphonic, our github or this repo.
+> Websites like neutts.com are popping up and they're not affiliated with Neuphonic, our github or this repo.
 >
 > We are on neuphonic.com only. Please be careful out there! 🙏
 
@@ -220,6 +220,18 @@ To specify a particular model repo for the backbone or codec, add the `--backbon
 > [!CAUTION]
 > If you are using a non-English backbone, it is highly recommended to use a same-language reference for best performance. See the 'example reference files' section below to select an appropriate example reference.
 
+### Device / Execution Provider Logic
+---------------------------------
+
+The same ONNX Runtime provider–selection logic used by the benchmarking tools is applied during normal inference and streaming via `neuttsair/neutts.py`.
+
+- The system detects available ONNX providers (examples: `CUDAExecutionProvider`, `ROCMExecutionProvider`, `DmlExecutionProvider`, `MetalExecutionProvider`, `CoreMLExecutionProvider`).
+- If a GPU/back-end provider is available it will be preferred; otherwise the runtime falls back to `CPUExecutionProvider`.
+- On Apple Silicon (M1/M2/M3) the default PyPI `onnxruntime` wheel may not expose Metal/CoreML providers. If no native macOS provider is present the codec will run on CPU — install a native macOS ONNX package (see `examples/README.md`) to enable `MetalExecutionProvider`/`CoreMLExecutionProvider`.
+- You can override automatic selection by passing `backbone_device` (for the backbone) or `codec_device` (for the decoder) to force `cpu` or a specific provider identifier (for example `--codec_device metal` or `--codec_device cuda:0`).
+
+
+
 ### One-Code Block Usage
 
 ```python
@@ -340,6 +352,8 @@ Models are now instantiated once per device during benchmarking and reused for t
 The console output includes your system metadata above the table so you can attribute results to a specific machine.
 
 The column values are reported as `mean ± standard deviation` across the configured runs.
+
+Note for macOS / Apple Silicon users: On M1/M2/M3 machines the ONNX decoder will automatically use the CPU if no Metal/CoreML execution providers are available; install a native macOS ONNX package (see `examples/README.md`) to enable `MetalExecutionProvider`/`CoreMLExecutionProvider` and request them with `--codec_device metal` or `--codec_device coreml`.
 
 Pass `--backbone_devices cpu,cuda` (or any comma-separated list) to benchmark the cross-product of backbone and codec execution targets—the resulting table reports both placements per row. You can also provide multiple repositories at once. For example, to compare the torch checkpoint with both GGUF variants (Q4 and Q8) across CPU/CUDA combinations:
 
