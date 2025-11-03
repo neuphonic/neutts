@@ -73,7 +73,7 @@ Note that `basic_streaming_example.py` requires a pre-encoded reference. `basic_
 To take advantage of encoding references ahead of time, we have a compiled the codec decoder into an [onnx graph](https://huggingface.co/neuphonic/neucodec-onnx-decoder) that enables inferencing NeuTTS without loading the encoder.
 This can be useful for running the model in resource-constrained environments where the encoder may add a large amount of extra latency/memory usage.
 
-To test the decoder, install the appropriate ONNX Runtime build (e.g. `onnxruntime` for CPU or `onnxruntime-gpu` for CUDA) and run one of the following:
+To test the decoder, install a matching ONNX Runtime build for your platform (examples below) and run one of the following:
 
 ```bash
 python -m examples.basic_example \
@@ -97,6 +97,35 @@ python -m examples.onnx_example_gpu \
 ```
 
 Set `--codec_device` to `auto` (default) to pick the first available GPU provider with an automatic CPU fallback. Use `cuda`/`cuda:0` (or `directml`, `rocm`) to request a specific provider—each will still fall back to CPU if unavailable. Pass `cpu` to disable GPU execution entirely.
+
+Mac / Apple Silicon notes
+-------------------------
+
+On Apple M1/M2/M3 machines there isn't a package named `onnxruntime-gpu` like on Linux/Windows. Recent official `onnxruntime` wheels for macOS may include native Metal/CoreML providers, and there are community builds (for example `onnxruntime-silicon` / `onnxruntime-metal`) that target Apple Silicon specifically.
+
+Suggested install steps for macOS (try them in order):
+
+```bash
+# 1) Try the official wheel first
+pip install --upgrade pip
+pip install onnxruntime
+
+# 2) If the official wheel doesn't expose Metal/CoreML providers, try a community wheel
+# (see https://github.com/cansik/onnxruntime-silicon for details). Example (may require a specific wheel URL):
+# pip install onnxruntime-silicon
+
+# 3) As a last resort, build ONNX Runtime from source with Metal/CoreML enabled following
+# the official ONNX Runtime build docs: https://onnxruntime.ai/docs/build/.
+```
+
+Verify what providers are available with this tiny check:
+
+```python
+import onnxruntime as ort
+print(ort.get_available_providers())
+```
+
+If the output contains `MetalExecutionProvider` or `CoreMLExecutionProvider`, you can request those via `--codec_device metal` or `--codec_device coreml` respectively. If no GPU providers are present the code will correctly fall back to `CPUExecutionProvider`.
 
 ### Streaming Support 
 >>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)

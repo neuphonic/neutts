@@ -23,3 +23,7 @@ All notable changes in this fork are documented here to help prepare an upstream
 
 ### Notes
 - Store generated audio and benchmark artifacts under `artifacts/` (these remain ignored by default) and omit them from commits.
+
+### Apple Silicon / macOS testing
+
+- Apple-specific ONNX providers (Metal/CoreML) were added to allow explicit requests like `--codec_device metal` or `--codec_device coreml`. NOTE: these providers and the macOS installation paths were implemented without direct access to Apple hardware for validation — the maintainer does not have an M1/M2/M3 machine to test on. If you have an Apple machine please verify the `MetalExecutionProvider`/`CoreMLExecutionProvider` behaviour and report any provider naming differences so we can refine the detection logic.
