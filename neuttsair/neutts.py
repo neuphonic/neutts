@@ -132,16 +132,10 @@ class NeuTTSAir:
 
         if backbone_repo.endswith("gguf"):
             if normalized in {"auto", "gpu", "cuda"}:
-                # Prefer CUDA when available, otherwise prefer Apple MPS on macOS
                 if torch.cuda.is_available():
                     return "gpu"
-                if cls._is_mps_available():
-                    # Some llama.cpp builds for macOS support Metal; prefer using
-                    # an 'mps' signal so downstream loading logic can enable
-                    # appropriate offload behaviour.
-                    return "mps"
                 warnings.warn(
-                    "GPU-backed GGUF requested but no supported GPU provider was detected; falling back to CPU.",
+                    "GPU-backed GGUF requested but CUDA is unavailable; falling back to CPU.",
                     RuntimeWarning,
                     stacklevel=3,
                 )
@@ -175,13 +169,7 @@ class NeuTTSAir:
                 repo_id=backbone_repo,
                 filename="*.gguf",
                 verbose=False,
-                # For GGUF/llama-cpp we set `n_gpu_layers` to -1 to enable
-                # GPU-backed layers when the selected device is a GPU. We
-                # also accept `mps` for macOS builds that provide Metal
-                # acceleration; treat `mps` equivalently to `gpu` for the
-                # purposes of n_gpu_layers but avoid enabling CUDA-specific
-                # flags like flash_attn.
-                n_gpu_layers=-1 if backbone_device in {"gpu", "mps"} else 0,
+                n_gpu_layers=-1 if backbone_device == "gpu" else 0,
                 n_ctx=self.max_context,
                 mlock=True,
                 flash_attn=True if backbone_device == "gpu" else False,
