@@ -13,6 +13,16 @@ from neucodec import NeuCodec, DistillNeuCodec
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
+LANGUAGE_MAP = {
+    "neuphonic/neutts-air": "en-us", 
+    "neuphonic/neutts-air-gguf-q4": "en-us", 
+    "neuphonic/neutts-air-gguf-q8": "en-us",
+    "neuphonic/neutts-nano": "en-us",
+    "neuphonic/neutts-nano-gguf-q4": "en-us",
+    "neuphonic/neutts-nano-gguf-q8": "en-us"
+}
+
+
 def _configure_espeak_library():
     """Auto-detect and configure espeak library on macOS."""
     if platform.system() != "Darwin":
@@ -78,6 +88,7 @@ class NeuTTS:
         backbone_device="cpu",
         codec_repo="neuphonic/neucodec",
         codec_device="cpu",
+        language=None
     ):
 
         # Consts
@@ -99,9 +110,7 @@ class NeuTTS:
 
         # Load phonemizer + models
         print("Loading phonemizer...")
-        self.phonemizer = EspeakBackend(
-            language="en-us", preserve_punctuation=True, with_stress=True
-        )
+        self._load_phonemizer(language, backbone_repo)
 
         self._load_backbone(backbone_repo, backbone_device)
 
@@ -119,6 +128,17 @@ class NeuTTS:
                 "Install with: pip install perth>=0.2.0"
             )
             self.watermarker = None
+
+    def _load_phonemizer(self, language, backbone_repo):
+        if not language:
+            if LANGUAGE_MAP.get(backbone_repo) is not None:
+                language = LANGUAGE_MAP[backbone_repo]
+            else:
+                raise ValueError("If you aren't using an official model, make sure to specify an eSpeak language code as the `language` parameter.")
+
+        self.phonemizer = EspeakBackend(
+            language=language, preserve_punctuation=True, with_stress=True
+        )
 
     def _load_backbone(self, backbone_repo, backbone_device):
         print(f"Loading backbone from: {backbone_repo} on {backbone_device} ...")
