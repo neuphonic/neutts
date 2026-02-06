@@ -132,7 +132,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 4. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
 
    ```bash
-   pip install "neutts[llama]"
+   pip install "neutts[llama]" # Note: This installs CPU only version.
    ```
 
    To run llama-cpp with GPU suport (CUDA, MPS) support please refer to:
