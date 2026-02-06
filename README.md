@@ -82,7 +82,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    cd neutts
    ```
 
-2. **Install `espeak` (required dependency)**
+2. **Install System Dependecies (required): `espeak`**
 
    Please refer to the following link for instructions on how to install `espeak`:
 
@@ -112,21 +112,27 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    setx PHONEMIZER_ESPEAK_PATH "c:\Program Files\eSpeak NG"
    ```
 
-3. **Install Python dependencies**
-
-   The requirements file includes the dependencies needed to run the model with PyTorch.
-   When using an ONNX decoder or a GGML model, some dependencies (such as PyTorch) are no longer required.
-
+3. **Install NeuTTS**
    ```bash
-   pip install -r requirements.txt
+   pip install neutts
+   ``` 
+
+   Alternatively to get the full install (including onnx and llama-cpp extensions):
+
+   ```bash 
+   pip install neutts[all] # to get onnx and llamacpp dependency
    ```
-   > [!CAUTION]
-   > The inference is compatible and tested on `python">=3.11, <=3.13"`. This is restricted due to pytorch compatibility. [PyTorch Compatibility Matrix](https://github.com/pytorch/pytorch/blob/main/RELEASE.md#release-compatibility-matrix)
+   
+   Or local editable install: 
+   ```bash 
+   pip install -e .
+   ```
+
 
 4. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
 
    ```bash
-   pip install llama-cpp-python
+   pip install "neutts[llama]"
    ```
 
    To run llama-cpp with GPU suport (CUDA, MPS) support please refer to:
@@ -135,7 +141,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 5. **(Optional) Install onnxruntime to use the `.onnx` decoder.**
    If you want to run the onnxdecoder
    ```bash
-   pip install onnxruntime
+   pip install "neutts[onnx]"
    ```
 
 ## Running the Model
@@ -160,7 +166,7 @@ from neutts import NeuTTS
 import soundfile as sf
 
 tts = NeuTTS(
-   backbone_repo="neuphonic/neutts-nano", # or 'neutts-nano-q4-gguf' with llama-cpp-python installed
+   backbone_repo="neuphonic/neutts-nano", # or 'neuphonic/neutts-nano-q4-gguf' with llama-cpp-python installed
    backbone_device="cpu",
    codec_repo="neuphonic/neucodec",
    codec_device="cpu"
