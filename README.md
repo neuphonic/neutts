@@ -132,14 +132,13 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 4. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
 
    ```bash
-   pip install "neutts[llama]" # Note: This installs CPU only version.
+   pip install "neutts[llama]" 
    ```
 
-   To run llama-cpp with GPU suport (CUDA, MPS) support please refer to:
+   Note that this installs llama-cpp without GPU support. To run llama-cpp with GPU support (e.g., CUDA, MPS) please refer to:
    https://pypi.org/project/llama-cpp-python/
 
 5. **(Optional) Install onnxruntime to use the `.onnx` decoder.**
-   If you want to run the onnxdecoder
    ```bash
    pip install "neutts[onnx]"
    ```
