@@ -14,12 +14,25 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
 LANGUAGE_MAP = {
+    # en models
     "neuphonic/neutts-air": "en-us", 
     "neuphonic/neutts-air-gguf-q4": "en-us", 
     "neuphonic/neutts-air-gguf-q8": "en-us",
     "neuphonic/neutts-nano": "en-us",
     "neuphonic/neutts-nano-gguf-q4": "en-us",
-    "neuphonic/neutts-nano-gguf-q8": "en-us"
+    "neuphonic/neutts-nano-gguf-q8": "en-us",
+    # de models
+    "neuphonic/neutts-nano-german": "de",
+    "neuphonic/neutts-nano-german-q4-gguf": "de",
+    "neuphonic/neutts-nano-german-q8-gguf": "de",
+    # fr models
+    "neuphonic/neutts-nano-french": "fr-fr",
+    "neuphonic/neutts-nano-french-q4-gguf": "fr-fr",
+    "neuphonic/neutts-nano-french-q8-gguf": "fr-fr",
+    # es models
+    "neuphonic/neutts-nano-spanish": "es",
+    "neuphonic/neutts-nano-spanish-q4-gguf": "es",
+    "neuphonic/neutts-nano-spanish-q8-gguf": "es",
 }
 
 
