@@ -270,3 +270,9 @@ To run the tests:
 ```
 pytest tests/
 ```
+
+To test loading of all the official backbone and codecs, use:
+
+```
+RUN_SLOW=true pytest tests/
+```
