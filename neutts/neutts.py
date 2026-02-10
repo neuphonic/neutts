@@ -8,12 +8,12 @@ import re
 import platform
 import glob
 import warnings
-from phonemizer.backend import EspeakBackend
 from neucodec import NeuCodec, DistillNeuCodec
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from .phonemizers import BasePhonemizer, CUSTOM_PHONEMIZERS
 
 
-LANGUAGE_MAP = {
+BACKBONE_LANGUAGE_MAP = {
     # en models
     "neuphonic/neutts-air": "en-us", 
     "neuphonic/neutts-air-q4-gguf": "en-us", 
@@ -144,14 +144,15 @@ class NeuTTS:
 
     def _load_phonemizer(self, language, backbone_repo):
         if not language:
-            if LANGUAGE_MAP.get(backbone_repo) is not None:
-                language = LANGUAGE_MAP[backbone_repo]
+            if BACKBONE_LANGUAGE_MAP.get(backbone_repo) is not None:
+                language = BACKBONE_LANGUAGE_MAP[backbone_repo]
             else:
-                raise ValueError("If you aren't using an official model, make sure to specify an eSpeak language code as the `language` parameter.")
+                raise ValueError("If you aren't using a Neuphonic model, make sure to specify an eSpeak language code as the `language` parameter.")
 
-        self.phonemizer = EspeakBackend(
-            language=language, preserve_punctuation=True, with_stress=True
-        )
+        if language in CUSTOM_PHONEMIZERS:
+            self.phonemizer = CUSTOM_PHONEMIZERS[language]
+        else:
+            self.phonemizer = BasePhonemizer(language_code=language)
 
     def _load_backbone(self, backbone_repo, backbone_device):
         print(f"Loading backbone from: {backbone_repo} on {backbone_device} ...")
