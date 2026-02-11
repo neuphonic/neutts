@@ -75,14 +75,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 > [!NOTE]
 > We have added a [streaming example](examples/basic_streaming_example.py) using the `llama-cpp-python` library as well as a [finetuning script](examples/finetune.py). For finetuning, please refer to the [finetune guide](TRAINING.md) for more details.
 
-1. **Clone Git Repo**
-
-   ```bash
-   git clone https://github.com/neuphonic/neutts.git
-   cd neutts
-   ```
-
-2. **Install System Dependecies (required): `espeak`**
+1. **Install System Dependecies (required): `espeak`**
 
    Please refer to the following link for instructions on how to install `espeak`:
 
@@ -112,39 +105,49 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    setx PHONEMIZER_ESPEAK_PATH "c:\Program Files\eSpeak NG"
    ```
 
-3. **Install NeuTTS**
+2. **Install NeuTTS**
    ```bash
    pip install neutts
-   ``` 
+   ```
 
    Alternatively to get the full install (including onnx and llama-cpp extensions):
 
-   ```bash 
+   ```bash
    pip install neutts[all] # to get onnx and llamacpp dependency
    ```
-   
-   Or local editable install: 
-   ```bash 
+
+   Or local editable install:
+   ```bash
    pip install -e .
    ```
 
 
-4. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
+3. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
 
    ```bash
-   pip install "neutts[llama]" 
+   pip install "neutts[llama]"
    ```
 
    Note that this installs llama-cpp without GPU support. To run llama-cpp with GPU support (e.g., CUDA, MPS) please refer to:
    https://pypi.org/project/llama-cpp-python/
 
-5. **(Optional) Install onnxruntime to use the `.onnx` decoder.**
+4. **(Optional) Install onnxruntime to use the `.onnx` decoder.**
    ```bash
    pip install "neutts[onnx]"
    ```
 
-## Running the Model
+## Examples
 
+To get started with the example scripts, clone the repository and navigate into the project directory:
+
+   ```bash
+   git clone https://github.com/neuphonic/neutts.git
+   cd neutts
+   ```
+
+
+
+### Basic Example
 Run the basic example script to synthesize speech:
 
 ```bash
