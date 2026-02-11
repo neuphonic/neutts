@@ -39,7 +39,7 @@ NeuTTS models are built from small LLM backbones - lightweight yet capable langu
 - **Power Consumption**: Optimised for mobile and embedded devices
 
 
-|  | NeuTTSAir | NeuTTSNano |
+|  | NeuTTS-Air | NeuTTS-Nano |
 |---|---:|---:|
 | **# Params (Active)** | ~360m | ~120m |
 | **# Params (Emb + Active)** | ~552m | ~229m |
@@ -75,9 +75,15 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 > [!NOTE]
 > We have added a [streaming example](examples/basic_streaming_example.py) using the `llama-cpp-python` library as well as a [finetuning script](examples/finetune.py). For finetuning, please refer to the [finetune guide](TRAINING.md) for more details.
 
-1. **Install System Dependecies (required): `espeak`**
+1. **Install System Dependencies (required): `espeak-ng`**
 
-   Please refer to the following link for instructions on how to install `espeak`:
+   > [!CAUTION]
+   > `espeak-ng` is an updated version of `espeak`, as of February 2026 on version 1.52.0. Older versions of `espeak` and `espeak-ng` can exhibit significant phonemisation issues, particularly for non-English languages. Updating your system version of `espeak-ng` to the latest version possible is highly recommended. 
+
+   > [!NOTE]
+   > `brew` on macOS Ventura and later, `apt` in Ubuntu version 25 or Debian version 13, and `choco`/`winget` on Windows, install the latest version of `espeak-ng` with the commands below. If you have a different or older operating system, you may need to install from source: see the following link https://github.com/espeak-ng/espeak-ng/blob/master/docs/building.md
+
+   Please refer to the following link for instructions on how to install `espeak-ng`:
 
    https://github.com/espeak-ng/espeak-ng/blob/master/docs/guide.md
 
@@ -91,7 +97,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    # Windows install
    # via chocolatey (https://community.chocolatey.org/packages?page=1&prerelease=False&moderatorQueue=False&tags=espeak)
    choco install espeak-ng
-   # via wingit
+   # via winget
    winget install -e --id eSpeak-NG.eSpeak-NG
    # via msi (need to add to path or folow the "Windows users who installed via msi" below)
    # find the msi at https://github.com/espeak-ng/espeak-ng/releases
@@ -110,42 +116,45 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    pip install neutts
    ```
 
-   Alternatively to get the full install (including onnx and llama-cpp extensions):
-
-   ```bash
-   pip install neutts[all] # to get onnx and llamacpp dependency
-   ```
-
-   Or local editable install:
+   Or for a local editable install, clone this repository and run in the base folder:
    ```bash
    pip install -e .
    ```
 
+   Alternatively to install all dependencies, including `onnxruntime` and `llama-cpp-python` (equivalent to steps 3 and 4 below):
 
-3. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
+   ```bash
+   pip install neutts[all]
+   ```
+
+   or for an editable install:
+
+   ```bash
+   pip install -e .[all]
+   ```
+
+3. **(Optional) Install `llama-cpp-python` to use `.gguf` models.**
 
    ```bash
    pip install "neutts[llama]"
    ```
 
-   Note that this installs llama-cpp without GPU support. To run llama-cpp with GPU support (e.g., CUDA, MPS) please refer to:
+   Note that this installs `llama-cpp-python` without GPU support. To install with GPU support (e.g., CUDA, MPS) please refer to:
    https://pypi.org/project/llama-cpp-python/
 
-4. **(Optional) Install onnxruntime to use the `.onnx` decoder.**
+4. **(Optional) Install `onnxruntime` to use the `.onnx` decoder.**
    ```bash
    pip install "neutts[onnx]"
    ```
 
 ## Examples
 
-To get started with the example scripts, clone the repository and navigate into the project directory:
+To get started with the example scripts, clone this repository and navigate into the project directory:
 
    ```bash
    git clone https://github.com/neuphonic/neutts.git
    cd neutts
    ```
-
-
 
 ### Basic Example
 Run the basic example script to synthesize speech:
