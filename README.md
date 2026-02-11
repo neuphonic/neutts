@@ -39,7 +39,7 @@ NeuTTS models are built from small LLM backbones - lightweight yet capable langu
 - **Power Consumption**: Optimised for mobile and embedded devices
 
 
-|  | NeuTTSAir | NeuTTSNano |
+|  | NeuTTS-Air | NeuTTS-Nano |
 |---|---:|---:|
 | **# Params (Active)** | ~360m | ~120m |
 | **# Params (Emb + Active)** | ~552m | ~229m |
@@ -82,9 +82,15 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    cd neutts
    ```
 
-2. **Install `espeak` (required dependency)**
+2. **Install `espeak-ng` (required dependency)**
 
-   Please refer to the following link for instructions on how to install `espeak`:
+> [!CAUTION]
+> `espeak-ng` is an updated version of `espeak`, as of February 2026 on version 1.52.0. Older versions of espeak can exhibit significant phonemisation issues, particularly for non-English languages. Updating your system version of `espeak-ng` to the latest version possible is highly recommended. 
+
+> [!NOTE]
+> `brew` on macOS Ventura and later, and `apt` in Ubuntu version 25 or Debian version 13, install the latest version of `espeak-ng`. If you have a different or older operating system, you may need to install from source: see the following link https://github.com/espeak-ng/espeak-ng/blob/master/docs/building.md
+
+   Please refer to the following link for instructions on how to install `espeak-ng`:
 
    https://github.com/espeak-ng/espeak-ng/blob/master/docs/guide.md
 
