@@ -300,7 +300,6 @@ class NeuTTS:
         phones = self.phonemizer.phonemize([text])
         phones = phones[0].split()
         phones = " ".join(phones)
-        print(phones)
         return phones
 
     def _apply_chat_template(
