@@ -10,7 +10,7 @@ authors = [
 ]
 description = "NeuTTS - a package for text-to-speech generation using Neuphonic's TTS models."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10, <3.14"
 dependencies = [
     "librosa==0.11.0",
     "neucodec>=0.0.4",
