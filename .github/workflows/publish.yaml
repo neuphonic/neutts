@@ -30,4 +30,4 @@ jobs:
 
     - name: Publish package
       run: |
-        poetry publish --build --repository pypiuv build
+        poetry publish --build --repository pypi
