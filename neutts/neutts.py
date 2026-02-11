@@ -5,8 +5,6 @@ import librosa
 import numpy as np
 import torch
 import re
-import platform
-import glob
 import warnings
 from neucodec import NeuCodec, DistillNeuCodec
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -34,36 +32,6 @@ BACKBONE_LANGUAGE_MAP = {
     "neuphonic/neutts-nano-spanish-q4-gguf": "es",
     "neuphonic/neutts-nano-spanish-q8-gguf": "es",
 }
-
-
-def _configure_espeak_library():
-    """Auto-detect and configure espeak library on macOS."""
-    if platform.system() != "Darwin":
-        return  # Only needed on macOS
-
-    # Common Homebrew installation paths
-    search_paths = [
-        "/opt/homebrew/Cellar/espeak/*/lib/libespeak.*.dylib",  # Apple Silicon
-        "/usr/local/Cellar/espeak/*/lib/libespeak.*.dylib",  # Intel
-        "/opt/homebrew/Cellar/espeak-ng/*/lib/libespeak-ng.*.dylib",  # Apple Silicon
-        "/usr/local/Cellar/espeak-ng/*/lib/libespeak-ng.*.dylib",
-    ]
-
-    for pattern in search_paths:
-        matches = glob.glob(pattern)
-        if matches:
-            try:
-                from phonemizer.backend.espeak.wrapper import EspeakWrapper
-
-                EspeakWrapper.set_library(matches[0])
-                return
-            except Exception:
-                # If this fails, phonemizer will try its default detection
-                pass
-
-
-# Call before using phonemizer
-_configure_espeak_library()
 
 
 def _linear_overlap_add(frames: list[np.ndarray], stride: int) -> np.ndarray:
@@ -332,6 +300,7 @@ class NeuTTS:
         phones = self.phonemizer.phonemize([text])
         phones = phones[0].split()
         phones = " ".join(phones)
+        print(phones)
         return phones
 
     def _apply_chat_template(
