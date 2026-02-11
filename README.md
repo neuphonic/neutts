@@ -84,11 +84,11 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 
 2. **Install `espeak-ng` (required dependency)**
 
-   > [!CAUTION]
-   > `espeak-ng` is an updated version of `espeak`, as of February 2026 on version 1.52.0. Older versions of espeak can exhibit significant phonemisation issues, particularly for non-English languages. Updating your system version of `espeak-ng` to the latest version possible is highly recommended. 
+> [!CAUTION]
+> `espeak-ng` is an updated version of `espeak`, as of February 2026 on version 1.52.0. Older versions of espeak can exhibit significant phonemisation issues, particularly for non-English languages. Updating your system version of `espeak-ng` to the latest version possible is highly recommended. 
 
-   > [!NOTE]
-   > `brew` on macOS Ventura and later, and `apt` in Ubuntu version 25 or Debian version 13, install the latest version of `espeak-ng`. If you have a different or older operating system, you may need to install from source: see the following link https://github.com/espeak-ng/espeak-ng/blob/master/docs/building.md
+> [!NOTE]
+> `brew` on macOS Ventura and later, and `apt` in Ubuntu version 25 or Debian version 13, install the latest version of `espeak-ng`. If you have a different or older operating system, you may need to install from source: see the following link https://github.com/espeak-ng/espeak-ng/blob/master/docs/building.md
 
    Please refer to the following link for instructions on how to install `espeak-ng`:
 
