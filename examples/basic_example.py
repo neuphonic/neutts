@@ -1,6 +1,7 @@
 import os
 import soundfile as sf
 from neutts import NeuTTS
+import torch
 
 
 def main(input_text, ref_audio_path, ref_text, backbone, output_path="output.wav"):
@@ -21,8 +22,13 @@ def main(input_text, ref_audio_path, ref_text, backbone, output_path="output.wav
         with open(ref_text, "r") as f:
             ref_text = f.read().strip()
 
-    print("Encoding reference audio")
-    ref_codes = tts.encode_reference(ref_audio_path)
+    if not os.path.exists(ref_audio_path.replace(".wav", ".pt")):
+        print("Encoding reference audio")
+        ref_codes = tts.encode_reference(ref_audio_path)
+        torch.save(ref_codes, ref_audio_path.replace(".wav", ".pt"))
+    else:
+        print("Loading pre-encoded reference audio")
+        ref_codes = torch.load(ref_audio_path.replace(".wav", ".pt"))
 
     print(f"Generating audio for input text: {input_text}")
     wav = tts.infer(input_text, ref_codes, ref_text)

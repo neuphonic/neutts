@@ -11,6 +11,12 @@ def main(input_text, ref_codes_path, ref_text, backbone):
         "neuphonic/neutts-air-q8-gguf",
         "neuphonic/neutts-nano-q4-gguf",
         "neuphonic/neutts-nano-q8-gguf",
+        "neuphonic/neutts-nano-french-q4-gguf",
+        "neuphonic/neutts-nano-french-q8-gguf",
+        "neuphonic/neutts-nano-spanish-q4-gguf",
+        "neuphonic/neutts-nano-spanish-q8-gguf",
+        "neuphonic/neutts-nano-german-q4-gguf",
+        "neuphonic/neutts-nano-german-q8-gguf",
     ], "Must be a GGUF ckpt as streaming is only currently supported by llama-cpp."
 
     # Initialize NeuTTS with the desired model and codec

@@ -1,5 +1,37 @@
 from typing import Union, List
 from phonemizer.backend import EspeakBackend
+import platform
+import glob
+
+def _configure_espeak_library():
+    """Auto-detect and configure espeak library on macOS."""
+    if platform.system() != "Darwin":
+        return  # Only needed on macOS
+
+    # Common Homebrew installation paths
+    search_paths = [
+        "/opt/homebrew/Cellar/espeak/*/lib/libespeak.*.dylib",  # Apple Silicon
+        "/usr/local/Cellar/espeak/*/lib/libespeak.*.dylib",  # Intel
+        "/opt/homebrew/Cellar/espeak-ng/*/lib/libespeak-ng.*.dylib",  # Apple Silicon
+        "/usr/local/Cellar/espeak-ng/*/lib/libespeak-ng.*.dylib",
+    ]
+
+    for pattern in search_paths:
+        matches = glob.glob(pattern)
+        if matches:
+            try:
+                from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+                EspeakWrapper.set_library(matches[0])
+                return
+            except Exception:
+                # If this fails, phonemizer will try its default detection
+                pass
+
+
+# Call before using phonemizer
+_configure_espeak_library()
+
 
 
 class BasePhonemizer:
