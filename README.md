@@ -2,9 +2,17 @@
 
 HuggingFace 🤗:
 
-- NeuTTS-Air: [Model](https://huggingface.co/neuphonic/neutts-air), [Q8 GGUF](https://huggingface.co/neuphonic/neutts-air-q8-gguf), [Q4 GGUF](https://huggingface.co/neuphonic/neutts-air-q4-gguf), [Spaces](https://huggingface.co/spaces/neuphonic/neutts-air)
-- NeuTTS-Nano: [Model](https://huggingface.co/neuphonic/neutts-nano), [Q8 GGUF](https://huggingface.co/neuphonic/neutts-nano-q8-gguf), [Q4 GGUF](https://huggingface.co/neuphonic/neutts-nano-q4-gguf), [Spaces](https://huggingface.co/spaces/neuphonic/neutts-nano)
+- NeuTTS-Air (English): [Model](https://huggingface.co/neuphonic/neutts-air), [Q8 GGUF](https://huggingface.co/neuphonic/neutts-air-q8-gguf), [Q4 GGUF](https://huggingface.co/neuphonic/neutts-air-q4-gguf), [Space](https://huggingface.co/spaces/neuphonic/neutts-air)
 
+- NeuTTS-Nano Multilingual Collection:
+   
+   The NeuTTS-Nano Multilingual Collection is a collection of monolingual speech language models with identical architectures - 3x fewer active parameters than NeuTTS-Air.
+
+   - [Multilingual Space](https://huggingface.co/spaces/neuphonic/neutts-nano-multilingual-collection)
+   - NeuTTS-Nano (English): [Model](https://huggingface.co/neuphonic/neutts-nano), [Q8 GGUF](https://huggingface.co/neuphonic/neutts-nano-q8-gguf), [Q4 GGUF](https://huggingface.co/neuphonic/neutts-nano-q4-gguf)
+   - NeuTTS-Nano-French: [Model](https://huggingface.co/neuphonic/neutts-nano-french), [Q8 GGUF](https://huggingface.co/neuphonic/neutts-nano-french-q8-gguf), [Q4 GGUF](https://huggingface.co/neuphonic/neutts-nano-french-q4-gguf)
+   - NeuTTS-Nano-German: [Model](https://huggingface.co/neuphonic/neutts-nano-german), [Q8 GGUF](https://huggingface.co/neuphonic/neutts-nano-german-q8-gguf), [Q4 GGUF](https://huggingface.co/neuphonic/neutts-nano-german-q4-gguf)
+   - NeuTTS-Nano-Spanish: [Model](https://huggingface.co/neuphonic/neutts-nano-spanish), [Q8 GGUF](https://huggingface.co/neuphonic/neutts-nano-spanish-q8-gguf), [Q4 GGUF](https://huggingface.co/neuphonic/neutts-nano-spanish-q4-gguf)
 
 [NeuTTS-Nano Demo Video](https://github.com/user-attachments/assets/629ec5b2-4818-4fa6-987a-99fcbadc56bc)
 
@@ -15,7 +23,7 @@ State-of-the-art Voice AI has been locked behind web APIs for too long. NeuTTS i
 ## Key Features
 
 - 🗣Best-in-class realism for their size - produce natural, ultra-realistic voices that sound human, at the sweet spot between speed, size, and quality for real-world applications
-- 📱Optimised for on-device deployment - provided in GGML format, ready to run on phones, laptops, or even Raspberry Pis
+- 📱Optimised for on-device deployment - quantisations provided in GGUF format, ready to run on phones, laptops, or even Raspberry Pis
 - 👫Instant voice cloning - create your own speaker with as little as 3 seconds of audio
 - 🚄Simple LM + codec architecture - making development and deployment simple
 
@@ -26,20 +34,18 @@ State-of-the-art Voice AI has been locked behind web APIs for too long. NeuTTS i
 
 ## Model Details
 
-
-
 NeuTTS models are built from small LLM backbones - lightweight yet capable language models optimised for text understanding and generation - as well as a powerful combination of technologies designed for efficiency and quality:
 
-- **Supported Languages**: English
+- **Supported Languages**: English, Spanish, German, French (model-dependent)
 - **Audio Codec**: [NeuCodec](https://huggingface.co/neuphonic/neucodec) - our 50hz neural audio codec that achieves exceptional audio quality at low bitrates using a single codebook
 - **Context Window**: 2048 tokens, enough for processing ~30 seconds of audio (including prompt duration)
-- **Format**: Available in GGML format for efficient on-device inference
+- **Format**: Quantisations available in GGUF format for efficient on-device inference
 - **Responsibility**: Watermarked outputs
 - **Inference Speed**: Real-time generation on mid-range devices
 - **Power Consumption**: Optimised for mobile and embedded devices
 
 
-|  | NeuTTS-Air | NeuTTS-Nano |
+|  | NeuTTS-Air | NeuTTS-Nano Models |
 |---|---:|---:|
 | **# Params (Active)** | ~360m | ~120m |
 | **# Params (Emb + Active)** | ~552m | ~229m |
@@ -48,15 +54,14 @@ NeuTTS models are built from small LLM backbones - lightweight yet capable langu
 
 ## Throughput Benchmarking
 
-The two models were benchmarked using the Q4 quantisations [neutts-air-Q4-0](https://huggingface.co/neuphonic/neutts-air-q4-gguf) and [neutts-nano-Q4-0](https://huggingface.co/neuphonic/neutts-nano-q4-gguf).
-Benchmarks on CPU were run through llama-bench (llama.cpp) to measure prefill and decode throughput at multiple context sizes.
+These benchmarks are for the Q4_0 quantisations [neutts-air-Q4_0](https://huggingface.co/neuphonic/neutts-air-q4-gguf) and [neutts-nano-Q4_0](https://huggingface.co/neuphonic/neutts-nano-q4-gguf). Note that all models in the NeuTTS-Nano Multilingual Collection have an identical architecture, so these results should apply for any Q4_0 model in the collection. 
 
-For GPU's (specifically RTX 4090), we leverage vLLM to maximise throughput. We run benchmarks using the [vLLM benchmark](https://docs.vllm.ai/en/stable/cli/bench/throughput/).
+CPU benchmarking used [llama-bench](https://github.com/ggml-org/llama.cpp/tree/master/tools/llama-bench) (from llama.cpp) to measure prefill and decode throughput at multiple context sizes. For the GPU benchmark (RTX 4090), we leverage vLLM to maximise throughput, using the [vLLM benchmark](https://docs.vllm.ai/en/stable/cli/bench/throughput/).
 
 We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4 16GB, NVIDIA GeForce RTX 4090.
 
 
-|  | NeuTTSAir | NeuTTSNano |
+|  | NeuTTS-Air | NeuTTS-Nano Models |
 |---|---:|---:|
 | **Galaxy A25 5G (CPU only)** | 20 tokens/s | 45 tokens/s|
 | **AMD Ryzen 9 HX 370 (CPU only)** | 119 tokens/s | 221 tokens/s |
@@ -77,11 +82,11 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 
 1. **Install System Dependencies (required): `espeak-ng`**
 
-   > [!CAUTION]
-   > `espeak-ng` is an updated version of `espeak`, as of February 2026 on version 1.52.0. Older versions of `espeak` and `espeak-ng` can exhibit significant phonemisation issues, particularly for non-English languages. Updating your system version of `espeak-ng` to the latest version possible is highly recommended. 
+> [!CAUTION]
+> `espeak-ng` is an updated version of `espeak`, as of February 2026 on version 1.52.0. Older versions of `espeak` and `espeak-ng` can exhibit significant phonemisation issues, particularly for non-English languages. Updating your system version of `espeak-ng` to the latest version possible is highly recommended. 
 
-   > [!NOTE]
-   > `brew` on macOS Ventura and later, `apt` in Ubuntu version 25 or Debian version 13, and `choco`/`winget` on Windows, install the latest version of `espeak-ng` with the commands below. If you have a different or older operating system, you may need to install from source: see the following link https://github.com/espeak-ng/espeak-ng/blob/master/docs/building.md
+> [!NOTE]
+> `brew` on macOS Ventura and later, `apt` in Ubuntu version 25 or Debian version 13, and `choco`/`winget` on Windows, install the latest version of `espeak-ng` with the commands below. If you have a different or older operating system, you may need to install from source: see the following link https://github.com/espeak-ng/espeak-ng/blob/master/docs/building.md
 
    Please refer to the following link for instructions on how to install `espeak-ng`:
 
@@ -156,6 +161,8 @@ To get started with the example scripts, clone this repository and navigate into
    cd neutts
    ```
 
+Several examples are available, including a Jupyter notebook in the `examples` folder.
+
 ### Basic Example
 Run the basic example script to synthesize speech:
 
@@ -166,9 +173,10 @@ python -m examples.basic_example \
   --ref_text samples/jo.txt
 ```
 
-To specify a particular model repo for the backbone or codec, add the `--backbone` argument. Available backbones are listed in [NeuTTS-Air](https://huggingface.co/collections/neuphonic/neutts-air) and [NeuTTS-Nano](https://huggingface.co/collections/neuphonic/neutts-nano) huggingface collections.
+To specify a particular model repo for the backbone or codec, add the `--backbone` argument. Available backbones are listed in [NeuTTS-Air](https://huggingface.co/collections/neuphonic/neutts-air) and [NeuTTS-Nano](https://huggingface.co/collections/neuphonic/neutts-nano) huggingface collections. 
 
-Several examples are available, including a Jupyter notebook in the `examples` folder.
+> [!CAUTION]
+> If you are using a non-English backbone, it is highly recommended to use a same-language reference for best performance. See the 'example reference files' section below to select an appropriate example reference.
 
 ### One-Code Block Usage
 
@@ -214,14 +222,21 @@ NeuTTS requires two inputs:
 1. A reference audio sample (`.wav` file)
 2. A text string
 
-The model then synthesises the text as speech in the style of the reference audio. This is what enables NeuTTS models instant voice cloning capability.
+The model then synthesises the text as speech in the style of the reference audio. This is what enables NeuTTS models' instant voice cloning capability.
 
 ### Example Reference Files
 
-You can find some ready-to-use samples in the `examples` folder:
+You can find some ready-to-use references in the `samples` folder:
 
-- `samples/dave.wav`
-- `samples/jo.wav`
+- English:
+   - `dave.wav`
+   - `jo.wav`
+- Spanish:
+   - `mateo.wav`
+- German:
+   - `greta.wav`
+- French:
+   - `juliette.wav`
 
 ### Guidelines for Best Results
 
@@ -239,10 +254,10 @@ For optimal performance, reference audio samples should be:
 For optimal performance on-device:
 
 1. Use the GGUF model backbones
-2. Pre-encode references
+2. Pre-encode references (see `examples/encode_reference.py` or `examples/basic_example.py`)
 3. Use the [onnx codec decoder](https://huggingface.co/neuphonic/neucodec-onnx-decoder)
 
-Take a look at this example [examples README](examples/README.md###minimal-latency-example) to get started.
+Take a look at this example in the [examples README](examples/README.md###minimal-latency-example) to get started.
 
 ## Responsibility
 

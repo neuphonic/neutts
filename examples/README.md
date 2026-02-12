@@ -19,8 +19,10 @@ Reference encoding can be done ahead of time to reduce latency whilst inferencin
 ```bash
 python -m examples.encode_reference \
  --ref_audio  ./samples/jo.wav \
- --output_path encoded_reference.pt
+ --output_path ./samples/jo.pt
  ```
+
+Note that `basic_streaming_example.py` requires a pre-encoded reference. `basic_example.py` will encode your reference if a pre-encoding does not exist, and will save and use it in future runs with the same reference.
 
 ### Minimal Latency Example
 
