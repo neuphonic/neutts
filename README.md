@@ -58,7 +58,7 @@ CPU benchmarking used [llama-bench](https://github.com/ggml-org/llama.cpp/tree/m
 We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4 16GB, NVIDIA GeForce RTX 4090.
 
 
-|  | NeuTTS-Air | NeuTTS-Nano Models |
+|  | NeuTTS-Air | NeuTTS-Nano |
 |---|---:|---:|
 | **Galaxy A25 5G (CPU only)** | 20 tokens/s | 45 tokens/s|
 | **AMD Ryzen 9 HX 370 (CPU only)** | 119 tokens/s | 221 tokens/s |
