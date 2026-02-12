@@ -125,7 +125,6 @@ class NeuTTS:
     def _load_backbone(self, backbone_repo, backbone_device):
         print(f"Loading backbone from: {backbone_repo} on {backbone_device} ...")
 
-        # GGUF loading
         if backbone_repo.endswith("gguf"):
 
             try:
@@ -137,7 +136,6 @@ class NeuTTS:
                     "    pip install llama-cpp-python"
                 ) from e
 
-            # If backbone_repo is a local file path, load it directly with llama.cpp
             if os.path.isfile(backbone_repo):
                 self.backbone = Llama(
                     model_path=backbone_repo,
@@ -148,7 +146,6 @@ class NeuTTS:
                     flash_attn=True if backbone_device == "gpu" else False,
                 )
             else:
-                # Fallback: treat it as a HF repo id (keeps original behavior if ever needed)
                 self.backbone = Llama.from_pretrained(
                     repo_id=backbone_repo,
                     filename="*.gguf",
@@ -171,7 +168,6 @@ class NeuTTS:
 
         print(f"Loading codec from: {codec_repo} on {codec_device} ...")
 
-        # 1) Local ONNX path (offline, recommended for embedded)
         if codec_repo.endswith(".onnx") and os.path.isfile(codec_repo):
             try:
                 from neucodec import NeuCodecOnnxDecoder
@@ -184,7 +180,6 @@ class NeuTTS:
             self.codec = NeuCodecOnnxDecoder(codec_repo)
             self._is_onnx_codec = True
 
-        # 2) Original HF-based behavior (use only if you really want remote download)
         match codec_repo:
             case "neuphonic/neucodec":
                 self.codec = NeuCodec.from_pretrained(codec_repo)
@@ -192,7 +187,7 @@ class NeuTTS:
             case "neuphonic/distill-neucodec":
                 self.codec = DistillNeuCodec.from_pretrained(codec_repo)
                 self.codec.eval().to(codec_device)
-            case "neuphonic/neucodec-onnx-decoder":
+            case "neuphonic/neucodec-onnx-decoder" | "neuphonic/neucodec-onnx-decoder-int8":
 
                 if codec_device != "cpu":
                     raise ValueError("Onnx decoder only currently runs on CPU.")

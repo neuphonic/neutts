@@ -36,10 +36,9 @@ _configure_espeak_library()
 
 
 class BasePhonemizer:
-    default_code = None
 
     def __init__(self, language_code: str = None):
-        self.code = language_code or self.default_code
+        self.code = language_code
         if not self.code:
             raise ValueError("A language code must be provided either via argument or subclass default")
 
@@ -76,42 +75,15 @@ class BasePhonemizer:
 
 
 class FrenchPhonemizer(BasePhonemizer):
-    default_code = "fr-fr"
+
+    def __init__(self, language_code: str = "fr-fr"):
+        super().__init__(language_code)
+
     def clean(self, phonemes: str) -> str:
         # Remove dashes (common in french output - indicates syllable, but not needed)
         return phonemes.replace("-", "")
 
 
-class GermanPhonemizer(BasePhonemizer):
-    default_code = "de"
-
-    def clean(self, phonemes: str) -> str:
-        if (1, 50, 0) <= self.espeak_version < (1, 52, 0):
-            warnings.warn(
-                "espeak-ng versions between 1.50.0 and 1.51.1 have a German phonemization issue (https://github.com/espeak-ng/espeak-ng/issues/890). Attempting to fix, but consider upgrading espeak-ng to 1.52.0 or later if possible."
-            )
-            # Patch a german phonemization issue present in these espeak versions
-            # See https://github.com/espeak-ng/espeak-ng/issues/890 and the fix in 1.52.0
-            # https://github.com/espeak-ng/espeak-ng/commit/c517074825422bfc7c2400f74ff4b4fb3d96e26e
-            original = phonemes
-            phonemes = re.sub(
-                r"y(?!ː)", "ʏ", phonemes
-            )  # Replace 'y' with 'ʏ' when not followed by a length marker
-            phonemes = phonemes.replace("i???", "iɐʊɐ")
-            phonemes = phonemes.replace("??", "ʊɐ")
-            phonemes = phonemes.replace("i?", "iɐ")
-            if phonemes != original:
-                warnings.warn(
-                    f"Attempted to fix German phonemization issue. Before: {original} After: {phonemes}"
-                )
-            if "?" in phonemes:  # should be an extremely rare edge case
-                warnings.warn(
-                    "Attempted fix failed. Please consider upgrading espeak-ng to 1.52.0 or later."
-                )
-        return phonemes
-
-
 CUSTOM_PHONEMIZERS = {
     "fr-fr": FrenchPhonemizer(),
-    "de": GermanPhonemizer(),
 }
