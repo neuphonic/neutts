@@ -173,7 +173,7 @@ python -m examples.basic_example \
   --ref_text samples/jo.txt
 ```
 
-To specify a particular model repo for the backbone or codec, add the `--backbone` argument. Available backbones are listed in [NeuTTS-Air](https://huggingface.co/collections/neuphonic/neutts-air) and [NeuTTS-Nano](https://huggingface.co/collections/neuphonic/neutts-nano) huggingface collections. 
+To specify a particular model repo for the backbone or codec, add the `--backbone` argument. Available backbones are listed in [NeuTTS-Air](https://huggingface.co/collections/neuphonic/neutts-air) and [NeuTTS-Nano Multilingual Collection](https://huggingface.co/collections/neuphonic/neutts-nano-multilingual-collection) huggingface collections. 
 
 > [!CAUTION]
 > If you are using a non-English backbone, it is highly recommended to use a same-language reference for best performance. See the 'example reference files' section below to select an appropriate example reference.
