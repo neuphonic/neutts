@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuTTSAir WASM Demo</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
+      .row { margin-bottom: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      label { min-width: 140px; display: inline-block; }
+      input[type="text"], input[type="url"] { width: 520px; max-width: 100%; padding: 6px 8px; }
+      button { padding: 8px 12px; }
+      .muted { color: #666; font-size: 12px; }
+      .status { margin-top: 8px; min-height: 1.2em; }
+      fieldset { border: 1px solid #ddd; padding: 12px; }
+      legend { padding: 0 6px; }
+      audio { width: 100%; margin-top: 12px; }
+      code { background: #f6f8fa; padding: 2px 4px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>NeuTTSAir WASM</h1>
+
+    <div class="row">
+      <label for="inputText">Input text</label>
+      <input id="inputText" type="text" placeholder="Type something to speak…" value="This is a sample reference text used for the NeuTTSAir WASM demo." />
+    </div>
+
+    <fieldset>
+      <legend>Reference</legend>
+      <div class="row">
+        <label for="refTextFile">Reference text (.txt)</label>
+        <input id="refTextFile" type="file" accept=".txt" />
+        <span class="muted">or use sample in <code>public/samples/ref_text.txt</code></span>
+      </div>
+      <div class="row">
+        <label for="refCodesFile">Reference codes (.json array)</label>
+        <input id="refCodesFile" type="file" accept=".json" />
+        <span class="muted">JSON array like <code>[12,34,…]</code> file</span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Backend</legend>
+      <div class="row">
+        <label>
+          <input id="useServer" type="checkbox" /> Use server to generate codes
+        </label>
+        <input id="serverUrl" type="url" placeholder="http://localhost:4000/api/generate" style="width: 420px" />
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Model</legend>
+      <div class="row">
+        <label for="modelPath">ONNX model path</label>
+        <input id="modelPath" type="text" placeholder="/models/neucodec_decoder.onnx" value="/models/neucodec_decoder.onnx" />
+      </div>
+    </fieldset>
+
+    <div class="row">
+      <button id="btnGenerate">Generate</button>
+      <span id="status" class="status"></span>
+    </div>
+
+    <audio id="player" controls></audio>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+  </html>
+
+
