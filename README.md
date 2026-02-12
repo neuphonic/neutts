@@ -118,34 +118,49 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    setx PHONEMIZER_ESPEAK_PATH "c:\Program Files\eSpeak NG"
    ```
 
-3. **Install Python dependencies**
-
-   The requirements file includes the dependencies needed to run the model with PyTorch.
-   When using an ONNX decoder or a GGML model, some dependencies (such as PyTorch) are no longer required.
-
+2. **Install NeuTTS**
    ```bash
-   pip install -r requirements.txt
-   ```
-   > [!CAUTION]
-   > The inference is compatible and tested on `python">=3.11, <=3.13"`. This is restricted due to pytorch compatibility. [PyTorch Compatibility Matrix](https://github.com/pytorch/pytorch/blob/main/RELEASE.md#release-compatibility-matrix)
-
-4. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
-
-   ```bash
-   pip install llama-cpp-python
+   pip install neutts
    ```
 
-   To run llama-cpp with GPU suport (CUDA, MPS) support please refer to:
+   Alternatively to get the full install (including onnx and llama-cpp extensions):
+
+   ```bash
+   pip install neutts[all] # to get onnx and llamacpp dependency
+   ```
+
+   Or local editable install:
+   ```bash
+   pip install -e .
+   ```
+
+
+3. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
+
+   ```bash
+   pip install "neutts[llama]"
+   ```
+
+   Note that this installs llama-cpp without GPU support. To run llama-cpp with GPU support (e.g., CUDA, MPS) please refer to:
    https://pypi.org/project/llama-cpp-python/
 
-5. **(Optional) Install onnxruntime to use the `.onnx` decoder.**
-   If you want to run the onnxdecoder
+4. **(Optional) Install onnxruntime to use the `.onnx` decoder.**
    ```bash
-   pip install onnxruntime
+   pip install "neutts[onnx]"
    ```
 
-## Running the Model
+## Examples
 
+To get started with the example scripts, clone the repository and navigate into the project directory:
+
+   ```bash
+   git clone https://github.com/neuphonic/neutts.git
+   cd neutts
+   ```
+
+
+
+### Basic Example
 Run the basic example script to synthesize speech:
 
 ```bash
@@ -166,7 +181,7 @@ from neutts import NeuTTS
 import soundfile as sf
 
 tts = NeuTTS(
-   backbone_repo="neuphonic/neutts-nano", # or 'neutts-nano-q4-gguf' with llama-cpp-python installed
+   backbone_repo="neuphonic/neutts-nano", # or 'neuphonic/neutts-nano-q4-gguf' with llama-cpp-python installed
    backbone_device="cpu",
    codec_repo="neuphonic/neucodec",
    codec_device="cpu"

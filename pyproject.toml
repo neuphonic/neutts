@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neutts"
+version = "1.0.0"
+authors = [
+  { name="neuphonic", email="general@neuphonic.com" },
+]
+description = "NeuTTS - a package for text-to-speech generation using Neuphonic's TTS models."
+readme = "README.md"
+requires-python = ">=3.10, <3.14"
+dependencies = [
+    "librosa==0.11.0",
+    "neucodec>=0.0.4",
+    "numpy~=2.2.6",
+    "phonemizer>=3.0.0",
+    "resemble-perth==1.0.1",
+    "soundfile==0.13.1",
+    "torch>=2.8.0",
+    "transformers~=4.56.1",
+]
+
+# Defining optional installations
+[project.optional-dependencies]
+llama = ["llama-cpp-python"]
+onnx = ["onnxruntime"]
+all = ["llama-cpp-python", "onnxruntime"]
+
+[tool.setuptools.packages.find]
+include = ["neutts*"]
