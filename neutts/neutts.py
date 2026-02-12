@@ -1,4 +1,5 @@
 import os
+import random
 from typing import Generator
 from pathlib import Path
 import librosa
@@ -144,6 +145,7 @@ class NeuTTS:
                     n_ctx=self.max_context,
                     mlock=True,
                     flash_attn=True if backbone_device == "gpu" else False,
+                    seed=random.randint(0, 2**32),
                 )
             else:
                 self.backbone = Llama.from_pretrained(
@@ -154,6 +156,7 @@ class NeuTTS:
                     n_ctx=self.max_context,
                     mlock=True,
                     flash_attn=True if backbone_device == "gpu" else False,
+                    seed=random.randint(0, 2**32),
                 )
 
             self._is_quantized_model = True
