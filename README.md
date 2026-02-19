@@ -137,33 +137,31 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 
 3. **(Optional) Install `llama-cpp-python` to use `.gguf` models.**
 
-   To run the examples using `llama.cpp` (GGML) under the hood, you need to install the `llama-cpp-python` dependency.
+   To run the examples using `llama.cpp` (GGML), you need to install the `llama-cpp-python` dependency.
 
    For the best performance, you must compile this package from source with hardware acceleration enabled for your specific operating system (CPU or GPU).
 
-   *(Note: The `--no-binary llama-cpp-python` flag is required in these commands to force pip to compile from source and respect your hardware flags!)*
-
-   #### 🍎 macOS (Apple Silicon)
+   #### macOS (Apple Silicon)
 
    For M-series Macs, it is highly recommended to use Apple's native Accelerate framework for optimized CPU performance:
 
    ```bash
-      CMAKE_ARGS="-DGGML_METAL=OFF -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple" pip install "neutts[llama]" --force-reinstall --no-cache-dir --no-binary llama-cpp-python
+      CMAKE_ARGS="-DGGML_METAL=OFF -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple" pip install "neutts[llama]" --force-reinstall --no-cache-dir
       ```
 
-   #### 🐧 Linux (OpenBLAS)
+   #### Linux (OpenBLAS)
    For Linux, you can accelerate CPU performance using OpenBLAS.
 
    *Prerequisite: Ensure you have OpenBLAS installed on your system (e.g., `sudo apt-get install libopenblas-dev` on Ubuntu). For other distros, refer to the [OpenBLAS Installation Guide](https://github.com/OpenMathLib/OpenBLAS/blob/develop/docs/install.md).*
 
    ```bash
-      CMAKE_ARGS="-DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS" pip install "neutts[llama]" --force-reinstall --no-cache-dir --no-binary llama-cpp-python
+      CMAKE_ARGS="-DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS" pip install "neutts[llama]" --force-reinstall --no-cache-dir
    ```
 
-   #### 🪟 Windows (OpenBLAS)
+   #### Windows (OpenBLAS)
    For Windows users utilizing PowerShell, set the environment variable and run the install command like this:
    ```bash
-      $env:CMAKE_ARGS="-DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS"; pip install "neutts[llama]" --force-reinstall --no-cache-dir --no-binary llama-cpp-python
+      $env:CMAKE_ARGS="-DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS"; pip install "neutts[llama]" --force-reinstall --no-cache-dir
    ```
 
    #### Looking for GPU Support?
