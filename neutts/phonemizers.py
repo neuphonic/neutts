@@ -2,8 +2,7 @@ from typing import Union, List
 from phonemizer.backend import EspeakBackend
 import platform
 import glob
-import warnings
-import re
+
 
 def _configure_espeak_library():
     """Auto-detect and configure espeak library on macOS."""
@@ -40,7 +39,9 @@ class BasePhonemizer:
     def __init__(self, language_code: str = None):
         self.code = language_code
         if not self.code:
-            raise ValueError("A language code must be provided either via argument or subclass default")
+            raise ValueError(
+                "A language code must be provided either via argument or subclass default"
+            )
 
         self.g2p = EspeakBackend(
             language=self.code,

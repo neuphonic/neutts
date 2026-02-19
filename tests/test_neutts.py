@@ -49,7 +49,7 @@ def _run_inference_test(backbone, codec, reference_data):
     assert not np.isnan(audio).any(), "Audio contains NaN values"
     assert audio.dtype in [np.float32, np.float64]
 
-    print(f"Successfully generated {len(audio)/24000:.2f}s of audio for {codec}")
+    print(f"Successfully generated {len(audio) / 24000:.2f}s of audio for {codec}")
 
 
 def _run_streaming_test(backbone, codec, reference_data):
@@ -89,7 +89,7 @@ def test_model_loading_and_inference(backbone, codec, reference_data):
 @pytest.mark.parametrize("codec", CODECS)
 def test_model_loading_and_inference_slow(backbone, codec, reference_data):
     if "RUN_SLOW" not in os.environ:
-         pytest.skip("Skipping slow tests...")
+        pytest.skip("Skipping slow tests...")
     else:
         _run_inference_test(backbone, codec, reference_data)
 
@@ -104,6 +104,6 @@ def test_streaming_ggml(backbone, codec, reference_data):
 @pytest.mark.parametrize("codec", CODECS)
 def test_streaming_ggml_slow(backbone, codec, reference_data):
     if "RUN_SLOW" not in os.environ:
-         pytest.skip("Skipping slow tests...")
+        pytest.skip("Skipping slow tests...")
     else:
         _run_streaming_test(backbone, codec, reference_data)

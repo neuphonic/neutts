@@ -14,8 +14,8 @@ from .phonemizers import BasePhonemizer, CUSTOM_PHONEMIZERS
 
 BACKBONE_LANGUAGE_MAP = {
     # en models
-    "neuphonic/neutts-air": "en-us", 
-    "neuphonic/neutts-air-q4-gguf": "en-us", 
+    "neuphonic/neutts-air": "en-us",
+    "neuphonic/neutts-air-q4-gguf": "en-us",
     "neuphonic/neutts-air-q8-gguf": "en-us",
     "neuphonic/neutts-nano": "en-us",
     "neuphonic/neutts-nano-q4-gguf": "en-us",
@@ -70,7 +70,7 @@ class NeuTTS:
         backbone_device="cpu",
         codec_repo="neuphonic/neucodec",
         codec_device="cpu",
-        language=None
+        language=None,
     ):
 
         # Consts
@@ -116,7 +116,10 @@ class NeuTTS:
             if BACKBONE_LANGUAGE_MAP.get(backbone_repo) is not None:
                 language = BACKBONE_LANGUAGE_MAP[backbone_repo]
             else:
-                raise ValueError("If you aren't using a Neuphonic model, make sure to specify an eSpeak language code as the `language` parameter.")
+                raise ValueError(
+                    """If you aren't using a Neuphonic model, make sure to specify an
+                      eSpeak language code as the `language` parameter."""
+                )
 
         if language in CUSTOM_PHONEMIZERS:
             self.phonemizer = CUSTOM_PHONEMIZERS[language]
