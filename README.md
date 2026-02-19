@@ -137,7 +137,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 
 3. **(Optional) Install `llama-cpp-python` to use `.gguf` models.**
 
-   To run the examples using `llama.cpp` (GGML), you need to install the `llama-cpp-python` dependency.
+   To use any of the GGUF backbones (e.g., in basic_streaming_example.py) you need to install the llama-cpp-python package.
 
    For the best performance, you must compile this package from source with hardware acceleration enabled for your specific operation system and target device (CPU or GPU).
 
@@ -165,7 +165,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    ```
 
    #### Looking for GPU Support?
-   If you have a dedicated GPU (Nvidia/CUDA, AMD/ROCm, or Mac Metal) and want to utilize it instead of the CPU, the CMAKE flags will be different.Please refer to the official [llama-cpp-python documentation](https://github.com/abetlen/llama-cpp-python/blob/main/README.md) for the exact flags required for your specific hardware.
+   If you have a dedicated GPU (Nvidia/CUDA, AMD/ROCm, M-Series Mac/Metal) and want to utilize it instead of the CPU, the CMAKE flags will be different.Please refer to the official [llama-cpp-python documentation](https://github.com/abetlen/llama-cpp-python/blob/main/README.md) for the exact flags required for your specific hardware.
 
 4. **(Optional) Install `onnxruntime` to use the `.onnx` decoder.**
    ```bash
