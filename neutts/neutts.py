@@ -1,5 +1,7 @@
+from contextlib import asynccontextmanager
 import os
 import random
+from types import SimpleNamespace
 from typing import Generator
 from pathlib import Path
 import librosa
@@ -10,6 +12,10 @@ import warnings
 from neucodec import NeuCodec, DistillNeuCodec
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from .phonemizers import BasePhonemizer, CUSTOM_PHONEMIZERS
+from fastapi import FastAPI, Response
+from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
+import logging
 
 
 BACKBONE_LANGUAGE_MAP = {
@@ -35,7 +41,9 @@ BACKBONE_LANGUAGE_MAP = {
 }
 
 
-def _linear_overlap_add(frames: list[np.ndarray], stride: int) -> np.ndarray:
+def _linear_overlap_add(
+    frames: list[np.ndarray], stride: int, power: float = 1.0
+) -> np.ndarray:
     # original impl --> https://github.com/facebookresearch/encodec/blob/main/encodec/utils.py
     assert len(frames)
     dtype = frames[0].dtype
@@ -47,17 +55,20 @@ def _linear_overlap_add(frames: list[np.ndarray], stride: int) -> np.ndarray:
         total_size = max(total_size, frame_end)
 
     sum_weight = np.zeros(total_size, dtype=dtype)
-    out = np.zeros(*shape, total_size, dtype=dtype)
+
+    out = np.zeros((*shape, total_size), dtype=dtype)
 
     offset: int = 0
     for frame in frames:
         frame_length = frame.shape[-1]
         t = np.linspace(0, 1, frame_length + 2, dtype=dtype)[1:-1]
-        weight = np.abs(0.5 - (t - 0.5))
+
+        weight = (0.5 - np.abs(t - 0.5)) ** power
 
         out[..., offset : offset + frame_length] += weight * frame
         sum_weight[offset : offset + frame_length] += weight
         offset += stride
+
     assert sum_weight.min() > 0
     return out / sum_weight
 
@@ -466,3 +477,53 @@ class NeuTTS:
             processed_recon = _linear_overlap_add(audio_cache, stride=self.streaming_stride_samples)
             processed_recon = processed_recon[n_decoded_samples:]
             yield processed_recon
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle model loading on startup to save time on endpoint calls"""
+    logging.info("Loading model...")
+
+    app.state.llm = SimpleNamespace()
+
+    app.state.llm.model = NeuTTS(
+        backbone_repo="neuphonic/neutts-nano-french-q8-gguf",
+        backbone_device="gpu",
+        codec_repo="neuphonic/neucodec-onnx-decoder",
+        codec_device="cpu",
+    )
+
+    logging.info("Model loaded successfully!")
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+class LLMRequest(BaseModel):
+    text: str
+    ref_codes_path: str | Path
+    ref_text: str
+
+
+@app.post("/generate-streaming")
+def generate(request: LLMRequest):
+
+    model = app.state.llm.model
+
+    logging.info("Loading reference audio...")
+    ref_codes_path = Path(request.ref_codes_path)
+    if not ref_codes_path.exists():
+        raise FileNotFoundError(
+            f"Must have pre-encoded reference file {ref_codes_path}"
+        )
+    ref_codes = torch.load(ref_codes_path)
+
+    logging.info("Generating audio...")
+
+    def audio_stream():
+        for wav_chunk in model.infer_stream(request.text, ref_codes, request.ref_text):
+            print(wav_chunk.shape)
+            yield (wav_chunk * 32767).astype(np.int16).tobytes()
+
+    return StreamingResponse(audio_stream(), media_type="application/octect-stream")
