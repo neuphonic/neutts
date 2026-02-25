@@ -148,7 +148,7 @@ class NeuTTS:
                     "    pip install llama-cpp-python"
                 ) from e
 
-            seed = random.randint(0, 2**32)
+            seed = 1337
             print(f"Using seed {seed}")
 
             if os.path.isfile(backbone_repo):
@@ -157,8 +157,12 @@ class NeuTTS:
                     verbose=False,
                     n_gpu_layers=-1 if backbone_device == "gpu" else 0,
                     n_ctx=self.max_context,
-                    mlock=True,
+                    use_mlock=True,
                     flash_attn=True if backbone_device == "gpu" else False,
+                    offload_kqv=True if backbone_device == "gpu" else False,
+                    kv_unified=True if backbone_device == "gpu" else False,
+                    op_offload=True if backbone_device == "gpu" else False,
+                    n_batch=self.max_context,
                     seed=seed,
                 )
             else:
@@ -168,8 +172,12 @@ class NeuTTS:
                     verbose=False,
                     n_gpu_layers=-1 if backbone_device == "gpu" else 0,
                     n_ctx=self.max_context,
-                    mlock=True,
+                    use_mlock=True,
                     flash_attn=True if backbone_device == "gpu" else False,
+                    offload_kqv=True if backbone_device == "gpu" else False,
+                    kv_unified=True if backbone_device == "gpu" else False,
+                    op_offload=True if backbone_device == "gpu" else False,
+                    n_batch=self.max_context,
                     seed=seed,
                 )
 
@@ -366,6 +374,7 @@ class NeuTTS:
         return output_str
 
     def _infer_ggml(self, ref_codes: list[int], ref_text: str, input_text: str) -> str:
+        self.backbone.reset()
         ref_text = self._to_phones(ref_text)
         input_text = self._to_phones(input_text)
 
@@ -380,6 +389,7 @@ class NeuTTS:
             temperature=1.0,
             top_k=50,
             stop=["<|SPEECH_GENERATION_END|>"],
+            seed=self.backbone._seed,
         )
         output_str = output["choices"][0]["text"]
         return output_str
@@ -387,6 +397,7 @@ class NeuTTS:
     def _infer_stream_ggml(
         self, ref_codes: torch.Tensor, ref_text: str, input_text: str
     ) -> Generator[np.ndarray, None, None]:
+        self.backbone.reset()
         ref_text = self._to_phones(ref_text)
         input_text = self._to_phones(input_text)
 
@@ -408,6 +419,7 @@ class NeuTTS:
             top_k=50,
             stop=["<|SPEECH_GENERATION_END|>"],
             stream=True,
+            seed=self.backbone._seed,
         ):
             output_str = item["choices"][0]["text"]
             token_cache.append(output_str)
