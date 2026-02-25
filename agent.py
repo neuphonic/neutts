@@ -6,11 +6,11 @@ import numpy as np
 import time
 import requests
 from pynput import keyboard
+from mlx_lm import load, generate
 
 from stream_audio import stream_generated_audio
 
 API_URL = "http://localhost:50250"
-LLM_URL = "http://localhost:50251"
 TTS_URL = "http://localhost:50252"
 
 # Microphone setup
@@ -29,6 +29,8 @@ conversation_history = []
 # Keep track of held keys to prevent OS key-repeat from triggering multiple streams
 held_keys = set()
 
+# load LLM
+model, tokenizer = load("mlx-community/LFM2.5-1.2B-Instruct-8bit")
 
 # def normalize(audio, target_rms=0.15):
 #     rms = np.sqrt(np.mean(audio**2))
@@ -75,15 +77,9 @@ def generate_response(spoken_text: str, mode: str):
         }
     )
     print(f"DEBUG: Sending to LLM:\n{data['messages'][0]['content']}\n")
-    response = requests.post(f"{LLM_URL}/v1/chat/completions", json=data)
-    response.raise_for_status()
-    text = (
-        response.json()["choices"][0]["message"]["content"]
-        .replace('"', "")
-        .replace("»", "")
-        .replace("«", "")
-        .strip()
-    )
+    prompt = tokenizer.apply_chat_template(data["messages"], add_generation_prompt=True)
+    response = generate(model, tokenizer, prompt)
+    text = response.replace('"', "").replace("»", "").replace("«", "").strip()
     return text
 
 def audio_callback(indata, frames, time_info, status):
