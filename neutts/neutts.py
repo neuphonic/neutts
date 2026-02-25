@@ -486,8 +486,15 @@ async def lifespan(app: FastAPI):
 
     app.state.llm = SimpleNamespace()
 
-    app.state.llm.model = NeuTTS(
+    app.state.llm.fr_model = NeuTTS(
         backbone_repo="neuphonic/neutts-nano-french-q8-gguf",
+        backbone_device="gpu",
+        codec_repo="neuphonic/neucodec-onnx-decoder",
+        codec_device="cpu",
+    )
+
+    app.state.llm.en_model = NeuTTS(
+        backbone_repo="neuphonic/neutts-nano-q8-gguf",
         backbone_device="gpu",
         codec_repo="neuphonic/neucodec-onnx-decoder",
         codec_device="cpu",
@@ -504,12 +511,17 @@ class LLMRequest(BaseModel):
     text: str
     ref_codes_path: str | Path
     ref_text: str
+    language: str
 
 
 @app.post("/generate-streaming")
 def generate(request: LLMRequest):
 
-    model = app.state.llm.model
+    model = (
+        app.state.llm.en_model
+        if request.language == "english"
+        else app.state.llm.fr_model
+    )
 
     logging.info("Loading reference audio...")
     ref_codes_path = Path(request.ref_codes_path)

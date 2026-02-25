@@ -55,15 +55,25 @@ def transcribe_audio(fpath: str, mode: str):
 
 
 def generate_response(spoken_text: str, mode: str):
-    # TODO support both modes
-    data = {
-        "messages": [
-            {
-                "role": "user",
-                "content": f'Respond with ONLY the following translated into French:\n\n"{spoken_text}"',
-            },
-        ]
-    }
+    data = (
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": f'Respond with ONLY the following translated into French:\n\n"{spoken_text}"',
+                },
+            ]
+        }
+        if mode == "en2fr"
+        else {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": f'Respond with ONLY the following translated into English:\n\n"{spoken_text}"',
+                },
+            ]
+        }
+    )
     print(f"DEBUG: Sending to LLM:\n{data['messages'][0]['content']}\n")
     response = requests.post(f"{LLM_URL}/v1/chat/completions", json=data)
     response.raise_for_status()
@@ -121,7 +131,7 @@ def stop_recording(mode: str):
         # --- Hack: remove the button press noises ---
         trim_duration = 0.05  # seconds to remove from start and end
         trim_samples = int(trim_duration * mic_sr)
-        
+
         # Ensure the recording is long enough to survive the trim
         if len(audio) > (2 * trim_samples):
             audio = audio[trim_samples : -trim_samples]
@@ -140,7 +150,15 @@ def stop_recording(mode: str):
         print(f"NORMALISED RESPONSE: '{normalised}'")
 
         print("Generating audio...")
-        stream_generated_audio(normalised)
+        ref_codes_path = "samples/juliette.pt" if mode == "en2fr" else "samples/jo.pt"
+        ref_text = "samples/juliette.txt" if mode == "en2fr" else "samples/jo.txt"
+        target_lang = "french" if mode == "en2fr" else "english"
+        stream_generated_audio(
+            normalised,
+            ref_codes_path=ref_codes_path,
+            ref_text=ref_text,
+            language=target_lang,
+        )
 
 
 # --- Keyboard Event Listeners for Toggle (macOS) ---

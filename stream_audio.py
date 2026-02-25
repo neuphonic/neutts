@@ -7,7 +7,10 @@ API_URL = "http://localhost:50252"
 
 
 def stream_generated_audio(
-    input_text, ref_codes_path="samples/juliette.pt", ref_text="samples/juliette.txt"
+    input_text,
+    ref_codes_path="samples/juliette.pt",
+    ref_text="samples/juliette.txt",
+    language="french",
 ):
 
     # Check if ref_text is a path if it is read it if not just return string
@@ -16,7 +19,12 @@ def stream_generated_audio(
             ref_text = f.read().strip()
 
     # prepare request data
-    data = {"text": input_text, "ref_codes_path": ref_codes_path, "ref_text": ref_text}
+    data = {
+        "text": input_text,
+        "ref_codes_path": ref_codes_path,
+        "ref_text": ref_text,
+        "language": language,
+    }
 
     # set up stream
     print(f"Generating audio for input text: {input_text}")
