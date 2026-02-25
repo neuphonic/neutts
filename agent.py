@@ -50,25 +50,31 @@ def transcribe_audio(fpath: str, mode: str):
     response = requests.post(f"{API_URL}/inference", files=files, data=data)
     response.raise_for_status()
     text = response.json()["text"]
+    # TODO normalise?
     return text
 
 
 def generate_response(spoken_text: str, mode: str):
-    global conversation_history
-    if mode == "chat" or mode == "translate":
-        conversation_history.append({"role": "user", "content": f"{spoken_text.lower()}"})
-    
-    data = {"messages": 
-            [{"role": "system", "content": "You are pretending to be Santa Claus, talking to a software engineer called Sohayb. Respond in English in strictly less than ten words."}]
-            + [conversation_history[-1]]
-    } 
-    
+    # TODO support both modes
+    data = {
+        "messages": [
+            {
+                "role": "user",
+                "content": f'Respond with ONLY the following translated into French:\n\n"{spoken_text}"',
+            },
+        ]
+    }
+    print(f"DEBUG: Sending to LLM:\n{data['messages'][0]['content']}\n")
     response = requests.post(f"{LLM_URL}/v1/chat/completions", json=data)
     response.raise_for_status()
-    
-    text = response.json()["choices"][0]["message"]["content"]
+    text = (
+        response.json()["choices"][0]["message"]["content"]
+        .replace('"', "")
+        .replace("»", "")
+        .replace("«", "")
+        .strip()
+    )
     return text
-
 
 def audio_callback(indata, frames, time_info, status):
     if recording:
