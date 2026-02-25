@@ -45,11 +45,11 @@ def transcribe_audio(fpath: str, mode: str):
         "temperature": "0.0",
         "temperature_inc": "0.2",
         "response_format": "json",
-        "language": "en" if mode == "chat" else "es"
+        "language": "en" if mode == "en2fr" else "fr",
     }
     response = requests.post(f"{API_URL}/inference", files=files, data=data)
     response.raise_for_status()
-    text = response.json()["text"].lower().replace("center", "santa")
+    text = response.json()["text"]
     return text
 
 
@@ -144,52 +144,52 @@ current_mode = None
 
 def on_press(key):
     global recording, current_mode
-    
+
     try:
         # --- CHAT TOGGLE ('z') ---
         if key.char == 'z':
             if not recording:
-                current_mode = "chat"
-                print("\n[STARTED] Recording CHAT mode. Press 'z' again to stop.")
+                current_mode = "en2fr"
+                print("\n[STARTED] Recording en2fr mode. Press 'z' again to stop.")
                 # Start in a background thread so time.sleep doesn't freeze the listener
                 threading.Thread(target=start_recording).start()
-                
-            elif current_mode == "chat":
-                print("\n[STOPPED] CHAT recording finished. Processing...")
+
+            elif current_mode == "en2fr":
+                print("\n[STOPPED] en2fr recording finished. Processing...")
                 # Run the heavy processing (LLM/TTS) in a background thread
-                threading.Thread(target=stop_recording, args=("chat",)).start()
+                threading.Thread(target=stop_recording, args=("en2fr",)).start()
                 current_mode = None
-                
-            elif current_mode == "translate":
-                print("Currently in translate mode! Press 'x' to stop it first.")
+
+            elif current_mode == "fr2en":
+                print("Currently in fr2en mode! Press 'x' to stop it first.")
 
         # --- TRANSLATE TOGGLE ('x') ---
         elif key.char == 'x':
             if not recording:
-                current_mode = "translate"
-                print("\n[STARTED] Recording TRANSLATE mode. Press 'x' again to stop.")
+                current_mode = "fr2en"
+                print("\n[STARTED] Recording fr2en mode. Press 'x' again to stop.")
                 threading.Thread(target=start_recording).start()
-                
-            elif current_mode == "translate":
-                print("\n[STOPPED] TRANSLATE recording finished. Processing...")
-                threading.Thread(target=stop_recording, args=("translate",)).start()
+
+            elif current_mode == "fr2en":
+                print("\n[STOPPED] fr2en recording finished. Processing...")
+                threading.Thread(target=stop_recording, args=("fr2en",)).start()
                 current_mode = None
-                
-            elif current_mode == "chat":
-                print("Currently in chat mode! Press 'z' to stop it first.")
-                
+
+            elif current_mode == "en2fr":
+                print("Currently in en2fr mode! Press 'z' to stop it first.")
+
     except AttributeError:
         # Ignore special keys (Shift, Ctrl, etc.)
         pass
-        
+
     # Allow exiting the script cleanly using the ESC key
     if key == keyboard.Key.esc:
         print("Exiting...")
         return False
 
 print("Toggle-to-talk ready.")
-print("  - Press 'z' to start/stop Chat.")
-print("  - Press 'x' to start/stop Translate.")
+print("  - Press 'z' to start/stop en2fr.")
+print("  - Press 'x' to start/stop fr2en.")
 print("  - Press ESC to quit.")
 
 # We only need on_press now; no need for on_release
