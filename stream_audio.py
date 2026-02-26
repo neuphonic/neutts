@@ -2,6 +2,8 @@ import os
 import pyaudio
 import requests
 from fire import Fire
+import numpy as np
+import time
 
 API_URL = "http://localhost:50252"
 
@@ -36,6 +38,11 @@ def stream_generated_audio(
     response = requests.post(f"{API_URL}/generate-streaming", json=data, stream=True)
     for chunk in response.iter_content(chunk_size=None):
         stream.write(chunk)
+
+    # Add a tail pad to avoid cutting off any final generation.
+    tail_pad = np.zeros(int(0.5 * 24000), dtype=np.int16)
+    stream.write(tail_pad.tobytes(), exception_on_underflow=False)
+    time.sleep(0.05)
 
     stream.stop_stream()
     stream.close()
