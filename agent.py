@@ -80,6 +80,10 @@ def generate_response(spoken_text: str, mode: str):
     prompt = tokenizer.apply_chat_template(data["messages"], add_generation_prompt=True)
     response = generate(model, tokenizer, prompt)
     text = response.replace('"', "").replace("»", "").replace("«", "").strip()
+    if mode == "fr2en":
+        text = text.replace("Eli", "eelye").replace(
+            "eli", "eelye"
+        )  # name pronunciation hack
     return text
 
 def audio_callback(indata, frames, time_info, status):
