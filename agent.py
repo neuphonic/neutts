@@ -43,11 +43,21 @@ def transcribe_audio(fpath: str, mode: str):
     files = {
         "file": open(fpath, "rb")
     }
+    match mode:
+        case "en2fr":
+            language = "en"
+        case "fr2en":
+            language = "fr"
+        case "ja2en":
+            language = "ja"
+        case _:
+            language = "en"  # fallback
+
     data = {
         "temperature": "0.0",
         "temperature_inc": "0.2",
         "response_format": "json",
-        "language": "en" if mode == "en2fr" else "fr",
+        "language": language,
     }
     response = requests.post(f"{API_URL}/inference", files=files, data=data)
     response.raise_for_status()
@@ -184,8 +194,10 @@ def on_press(key):
                 threading.Thread(target=stop_recording, args=("en2fr",)).start()
                 current_mode = None
 
-            elif current_mode == "fr2en":
-                print("Currently in fr2en mode! Press 'x' to stop it first.")
+            elif current_mode == "fr2en" or current_mode == "ja2en":
+                print(
+                    f"Currently in {current_mode} mode! Press toggle key again to stop it first."
+                )
 
         # --- TRANSLATE TOGGLE ('x') ---
         elif key.char == 'x':
@@ -199,8 +211,27 @@ def on_press(key):
                 threading.Thread(target=stop_recording, args=("fr2en",)).start()
                 current_mode = None
 
-            elif current_mode == "en2fr":
-                print("Currently in en2fr mode! Press 'z' to stop it first.")
+            elif current_mode == "en2fr" or current_mode == "ja2en":
+                print(
+                    f"Currently in {current_mode} mode! Press toggle key again to stop it first."
+                )
+
+        # --- TRANSLATE TOGGLE ('c') ---
+        elif key.char == "c":
+            if not recording:
+                current_mode = "ja2en"
+                print("\n[STARTED] Recording ja2en mode. Press 'c' again to stop.")
+                threading.Thread(target=start_recording).start()
+
+            elif current_mode == "ja2en":
+                print("\n[STOPPED] ja2en recording finished. Processing...")
+                threading.Thread(target=stop_recording, args=("ja2en",)).start()
+                current_mode = None
+
+            elif current_mode == "en2fr" or current_mode == "fr2en":
+                print(
+                    f"Currently in {current_mode} mode! Press toggle key again to stop it first."
+                )
 
     except AttributeError:
         # Ignore special keys (Shift, Ctrl, etc.)
@@ -214,6 +245,7 @@ def on_press(key):
 print("Toggle-to-talk ready.")
 print("  - Press 'z' to start/stop en2fr.")
 print("  - Press 'x' to start/stop fr2en.")
+print("  - Press 'c' to start/stop ja2en.")
 print("  - Press ESC to quit.")
 
 # We only need on_press now; no need for on_release
