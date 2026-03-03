@@ -95,7 +95,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--backbone",
         type=str,
-        default="neuphonic/neutts-nano-german-update-q4-gguf",
+        default="NeuphonicClients/neutts-nano-german-update-q4-gguf",
         help="Huggingface repo containing the backbone checkpoint. Must be GGUF.",
     )
     parser.add_argument(
