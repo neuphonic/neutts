@@ -35,7 +35,9 @@ BACKBONE_LANGUAGE_MAP = {
 }
 
 
-def _linear_overlap_add(frames: list[np.ndarray], stride: int) -> np.ndarray:
+def _linear_overlap_add(
+    frames: list[np.ndarray], stride: int, power: float = 1.0
+) -> np.ndarray:
     # original impl --> https://github.com/facebookresearch/encodec/blob/main/encodec/utils.py
     assert len(frames)
     dtype = frames[0].dtype
@@ -47,17 +49,20 @@ def _linear_overlap_add(frames: list[np.ndarray], stride: int) -> np.ndarray:
         total_size = max(total_size, frame_end)
 
     sum_weight = np.zeros(total_size, dtype=dtype)
-    out = np.zeros(*shape, total_size, dtype=dtype)
+
+    out = np.zeros((*shape, total_size), dtype=dtype)
 
     offset: int = 0
     for frame in frames:
         frame_length = frame.shape[-1]
         t = np.linspace(0, 1, frame_length + 2, dtype=dtype)[1:-1]
-        weight = np.abs(0.5 - (t - 0.5))
+
+        weight = (0.5 - np.abs(t - 0.5)) ** power
 
         out[..., offset : offset + frame_length] += weight * frame
         sum_weight[offset : offset + frame_length] += weight
         offset += stride
+
     assert sum_weight.min() > 0
     return out / sum_weight
 
