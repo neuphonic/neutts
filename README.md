@@ -77,43 +77,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 > [!NOTE]
 > We have added a [streaming example](examples/basic_streaming_example.py) using the `llama-cpp-python` library as well as a [finetuning script](examples/finetune.py). For finetuning, please refer to the [finetune guide](TRAINING.md) for more details.
 
-1. **Install System Dependencies (required): `espeak-ng`**
-
-> [!CAUTION]
-> `espeak-ng` is an updated version of `espeak`, as of February 2026 on version 1.52.0. Older versions of `espeak` and `espeak-ng` can exhibit significant phonemisation issues, particularly for non-English languages. Updating your system version of `espeak-ng` to the latest version possible is highly recommended.
-
-> [!NOTE]
-> `brew` on macOS Ventura and later, `apt` in Ubuntu version 25 or Debian version 13, and `choco`/`winget` on Windows, install the latest version of `espeak-ng` with the commands below. If you have a different or older operating system, you may need to install from source: see the following link https://github.com/espeak-ng/espeak-ng/blob/master/docs/building.md
-
-   Please refer to the following link for instructions on how to install `espeak-ng`:
-
-   https://github.com/espeak-ng/espeak-ng/blob/master/docs/guide.md
-
-   ```bash
-   # Mac OS
-   brew install espeak-ng
-
-   # Ubuntu/Debian
-   sudo apt install espeak-ng
-
-   # Windows install
-   # via chocolatey (https://community.chocolatey.org/packages?page=1&prerelease=False&moderatorQueue=False&tags=espeak)
-   choco install espeak-ng
-   # via winget
-   winget install -e --id eSpeak-NG.eSpeak-NG
-   # via msi (need to add to path or folow the "Windows users who installed via msi" below)
-   # find the msi at https://github.com/espeak-ng/espeak-ng/releases
-   ```
-
-   Windows users who installed via msi / do not have their install on path need to run the following (see https://github.com/bootphon/phonemizer/issues/163)
-   ```pwsh
-   $env:PHONEMIZER_ESPEAK_LIBRARY = "c:\Program Files\eSpeak NG\libespeak-ng.dll"
-   $env:PHONEMIZER_ESPEAK_PATH = "c:\Program Files\eSpeak NG"
-   setx PHONEMIZER_ESPEAK_LIBRARY "c:\Program Files\eSpeak NG\libespeak-ng.dll"
-   setx PHONEMIZER_ESPEAK_PATH "c:\Program Files\eSpeak NG"
-   ```
-
-2. **Install NeuTTS**
+1. **Install NeuTTS**
    ```bash
    pip install neutts
    ```
@@ -135,7 +99,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    pip install -e .[all]
    ```
 
-3. **(Optional) Install `llama-cpp-python` to use `.gguf` models.**
+2. **(Optional) Install `llama-cpp-python` to use `.gguf` models.**
 
    To use any of the GGUF backbones (e.g., in basic_streaming_example.py) you need to install the llama-cpp-python package.
 
@@ -170,7 +134,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    #### Looking for GPU Support?
    If you have a dedicated GPU (Nvidia/CUDA, AMD/ROCm, M-Series Mac/Metal) and want to utilize it instead of the CPU, the CMAKE flags will be different.Please refer to the official [llama-cpp-python documentation](https://github.com/abetlen/llama-cpp-python/blob/main/README.md) for the exact flags required for your specific hardware.
 
-4. **(Optional) Install `onnxruntime` to use the `.onnx` decoder.**
+3. **(Optional) Install `onnxruntime` to use the `.onnx` decoder.**
    ```bash
    pip install "neutts[onnx]"
    ```
