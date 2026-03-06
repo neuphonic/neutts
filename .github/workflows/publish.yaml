@@ -1,33 +1,45 @@
 name: Publish to PyPi
 
 on:
-  workflow_dispatch: # Allows manual triggering from the GitHub UI
+  workflow_dispatch:
 
 jobs:
-  build:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
-    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.10"
+      - uses: actions/checkout@v4
 
-    - name: Install Poetry
-      run: |
-        curl -sSL https://install.python-poetry.org | python3 -
-        export PATH="$HOME/.local/bin:$PATH"
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.22.0
+        env:
+          CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-*"
+          CIBW_SKIP: "*-manylinux_i686 *-musllinux_*"
+          CIBW_BEFORE_ALL: "pip install cmake"
 
-    - name: Install dependencies
-      run: |
-        poetry install
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
 
-    - name: Set up PyPi repo and token
-      run: |
-        poetry config repositories.pypi https://upload.pypi.org/legacy/
-        poetry config http-basic.pypi __token__ ${{ secrets.PYPI_TOKEN }}
+  publish:
+    name: Publish to PyPI
+    needs: build_wheels
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Publish package
-      run: |
-        poetry publish --build --repository pypi
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
