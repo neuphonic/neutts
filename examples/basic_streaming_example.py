@@ -126,7 +126,7 @@ def main(input_text, ref_codes_path, ref_text, backbone, language):
     total_time = time.perf_counter() - start_time
 
     # Add a tail pad to avoid cutting off any final generation.
-    tail_pad = np.zeros(int(0.25 * tts.sample_rate), dtype=np.int16)
+    tail_pad = np.zeros(int(0.5 * tts.sample_rate), dtype=np.int16)
     audio_queue.put(tail_pad.tobytes())
 
     audio_queue.put(None)
