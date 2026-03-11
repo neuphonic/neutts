@@ -4,10 +4,47 @@ import numpy as np
 from neutts import NeuTTS
 import pyaudio
 import time
+import queue
+import threading
 
 
 def _read_if_path(value: str) -> str:
     return open(value, "r", encoding="utf-8").read().strip() if os.path.exists(value) else value
+
+
+def audio_player_thread(audio_queue, stream, prefill_chunks=0):
+    # Increase prefill_chunks if RTF is slow to allow for smooth playback
+    PLAYBACK_CHUNK_BYTES = 2048
+    buffer = []
+
+    for _ in range(prefill_chunks):
+        chunk = audio_queue.get()
+        if chunk is None:
+            buffer.append(None)
+            break
+        buffer.append(chunk)
+
+    for chunk in buffer:
+        if chunk is None:
+            audio_queue.task_done()
+            return
+        for i in range(0, len(chunk), PLAYBACK_CHUNK_BYTES):
+            stream.write(
+                chunk[i : i + PLAYBACK_CHUNK_BYTES], exception_on_underflow=False
+            )
+        audio_queue.task_done()
+
+    while True:
+        audio_bytes = audio_queue.get()
+        if audio_bytes is None:
+            audio_queue.task_done()
+            break
+
+        for i in range(0, len(audio_bytes), PLAYBACK_CHUNK_BYTES):
+            slice_bytes = audio_bytes[i : i + PLAYBACK_CHUNK_BYTES]
+            stream.write(slice_bytes, exception_on_underflow=False)
+
+        audio_queue.task_done()
 
 
 def main(input_text, ref_codes_path, ref_text, backbone):
@@ -43,49 +80,57 @@ def main(input_text, ref_codes_path, ref_text, backbone):
     print(f"Generating audio for input text: {input_text}")
     p = pyaudio.PyAudio()
     stream = p.open(
-        format=pyaudio.paInt16,
-        channels=1,
-        rate=tts.sample_rate,
-        output=True,
-        frames_per_buffer=int(tts.streaming_stride_samples),
+        format=pyaudio.paInt16, channels=1, rate=tts.sample_rate, output=True
     )
 
+    audio_queue = queue.Queue()
+    player = threading.Thread(target=audio_player_thread, args=(audio_queue, stream))
+    player.start()
+
     total_audio_samples = 0
-    total_lm_time = 0.0
+    total_gen_time = 0.0
     chunk_count = 0
-    last_yield_time = None
     start_time = time.perf_counter()
+    last_yield_time = start_time
+
     print("Streaming...")
     print("-" * 80)
 
     for chunk in tts.infer_stream(input_text, ref_codes, ref_text):
         chunk_count += 1
         now = time.perf_counter()
-        lm_duration = None
-        if last_yield_time is not None:
-            lm_duration = now - last_yield_time
-            total_lm_time += lm_duration
+        gen_duration = now - last_yield_time
+        total_gen_time += gen_duration
         last_yield_time = now
+
         # Write audio
         audio = (chunk * 32767).astype(np.int16)
-        stream.write(audio.tobytes(), exception_on_underflow=False)
+        audio_queue.put(audio.tobytes())
         total_audio_samples += audio.shape[0]
+
         # Per-chunk timing log for latency info
         chunk_ms_actual = audio.shape[0] / tts.sample_rate * 1000
-        lm_ms = f"{lm_duration * 1000:6.1f}ms" if lm_duration is not None else "  n/a "
-        rt_percent = (
-            (lm_duration / (chunk_ms_actual / 1000) * 100) if lm_duration is not None else 0.0
-        )
-        print(
-            f"Chunk {chunk_count:2d}: "
-            f"LM={lm_ms} │ Audio={chunk_ms_actual:5.1f}ms │ {rt_percent:5.1f}% RT"
-        )
-    # Add a tail pad to avoid cutting off any final generation.
-    tail_pad = np.zeros(int(0.25 * tts.sample_rate), dtype=np.int16)
-    stream.write(tail_pad.tobytes(), exception_on_underflow=False)
-    time.sleep(0.05)
+        gen_ms = f"{gen_duration * 1000:6.1f}ms"
+        rt_percent = gen_duration / (chunk_ms_actual / 1000) * 100
+
+        if chunk_count == 1:
+            print(
+                f"Chunk {chunk_count:2d}: Generation Time={gen_ms} (TTFA) │ Chunk Size={chunk_ms_actual:5.1f}ms │ {rt_percent:5.1f}% RT"
+            )
+        else:
+            print(
+                f"Chunk {chunk_count:2d}: Generation Time={gen_ms}        │ Chunk Size={chunk_ms_actual:5.1f}ms │ {rt_percent:5.1f}% RT"
+            )
 
     total_time = time.perf_counter() - start_time
+
+    # Add a tail pad to avoid cutting off any final generation.
+    tail_pad = np.zeros(int(0.25 * tts.sample_rate), dtype=np.int16)
+    audio_queue.put(tail_pad.tobytes())
+
+    audio_queue.put(None)
+    player.join()
+
     total_audio_seconds = total_audio_samples / tts.sample_rate if total_audio_samples else 0.0
 
     # Print stats
@@ -95,7 +140,9 @@ def main(input_text, ref_codes_path, ref_text, backbone):
     )
 
     if chunk_count:
-        print(f"  → Average Speech LM time per chunk: {(total_lm_time / chunk_count) * 1000:.1f}ms")
+        print(
+            f"  → Average generation time per chunk: {(total_gen_time / chunk_count) * 1000:.1f}ms"
+        )
         if total_audio_seconds:
             rtf = total_time / total_audio_seconds
             print(f"  → Real-Time Factor (RTF): {rtf:.2f}")
