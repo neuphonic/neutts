@@ -47,20 +47,20 @@ def audio_player_thread(audio_queue, stream, prefill_chunks=0):
         audio_queue.task_done()
 
 
-def main(input_text, ref_codes_path, ref_text, backbone):
+def main(input_text, ref_codes_path, ref_text, backbone, language):
 
-    assert backbone in [
-        "neuphonic/neutts-air-q4-gguf",
-        "neuphonic/neutts-air-q8-gguf",
-        "neuphonic/neutts-nano-q4-gguf",
-        "neuphonic/neutts-nano-q8-gguf",
-        "neuphonic/neutts-nano-french-q4-gguf",
-        "neuphonic/neutts-nano-french-q8-gguf",
-        "neuphonic/neutts-nano-spanish-q4-gguf",
-        "neuphonic/neutts-nano-spanish-q8-gguf",
-        "neuphonic/neutts-nano-german-q4-gguf",
-        "neuphonic/neutts-nano-german-q8-gguf",
-    ], "Must be a GGUF ckpt as streaming is only currently supported by llama-cpp."
+    # assert backbone in [
+    #     "neuphonic/neutts-air-q4-gguf",
+    #     "neuphonic/neutts-air-q8-gguf",
+    #     "neuphonic/neutts-nano-q4-gguf",
+    #     "neuphonic/neutts-nano-q8-gguf",
+    #     "neuphonic/neutts-nano-french-q4-gguf",
+    #     "neuphonic/neutts-nano-french-q8-gguf",
+    #     "neuphonic/neutts-nano-spanish-q4-gguf",
+    #     "neuphonic/neutts-nano-spanish-q8-gguf",
+    #     "neuphonic/neutts-nano-german-q4-gguf",
+    #     "neuphonic/neutts-nano-german-q8-gguf",
+    # ], "Must be a GGUF ckpt as streaming is only currently supported by llama-cpp."
 
     # Initialize NeuTTS with the desired model and codec
     tts = NeuTTS(
@@ -68,6 +68,7 @@ def main(input_text, ref_codes_path, ref_text, backbone):
         backbone_device="cpu",
         codec_repo="neuphonic/neucodec-onnx-decoder",
         codec_device="cpu",
+        language=language,
     )
 
     input_text = _read_if_path(input_text)
@@ -165,14 +166,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--ref_codes",
         type=str,
-        default="./samples/jo.pt",
+        default="./samples/carla.pt",
         help="Path to pre-encoded reference audio",
     )
     parser.add_argument(
         "--ref_text",
         type=str,
-        default="./samples/jo.txt",
+        default="./samples/carla.txt",
         help="Reference text corresponding to the reference audio",
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="de",
+        help="Espeak code for target language",
     )
     parser.add_argument(
         "--output_path",
@@ -183,7 +190,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--backbone",
         type=str,
-        default="neuphonic/neutts-nano-q8-gguf",
+        default="NeuphonicClients/neutts-nano-german-update-q4-gguf",
         help="Huggingface repo containing the backbone checkpoint. Must be GGUF.",
     )
     args = parser.parse_args()
@@ -192,4 +199,5 @@ if __name__ == "__main__":
         ref_codes_path=args.ref_codes,
         ref_text=args.ref_text,
         backbone=args.backbone,
+        language=args.language,
     )
