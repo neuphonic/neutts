@@ -22,7 +22,7 @@ def main(input_text, ref_audio_path, ref_text, backbone, output_path="output.wav
             ref_text = f.read().strip()
 
     print("Encoding reference audio")
-    ref_codes = tts.encode_reference(ref_audio_path)
+    ref_codes = tts.encode(ref_audio_path)
 
     print(f"Generating audio for input text: {input_text}")
     wav = tts.infer(input_text, ref_codes, ref_text)

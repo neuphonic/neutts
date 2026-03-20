@@ -171,7 +171,7 @@ ref_text = "samples/jo.txt"
 ref_audio_path = "samples/jo.wav"
 
 ref_text = open(ref_text, "r").read().strip()
-ref_codes = tts.encode_reference(ref_audio_path)
+ref_codes = tts.encode(ref_audio_path)
 
 wav = tts.infer(input_text, ref_codes, ref_text)
 sf.write("test.wav", wav, 24000)
