@@ -1,9 +1,9 @@
 import os
 from typing import Generator
 from pathlib import Path
-import librosa
 import numpy as np
 import torch
+import torchaudio
 import re
 import platform
 import glob
@@ -39,8 +39,7 @@ def _configure_espeak_library():
                 pass
 
 
-# Call before using phonemizer
-_configure_espeak_library()
+
 
 
 def _linear_overlap_add(frames: list[np.ndarray], stride: int) -> np.ndarray:
@@ -99,10 +98,16 @@ class NeuTTS:
 
         # Load phonemizer + models
         print("Loading phonemizer...")
-        self.phonemizer = EspeakBackend(
-            language="en-us", preserve_punctuation=True, with_stress=True
-        )
+        # Call before using phonemizer 
+        # TODO: Modify branching condition
+        if "qwen3" not in backbone_repo:
+            _configure_espeak_library()
+            self.phonemizer = EspeakBackend(
+                language="en-us", preserve_punctuation=True, with_stress=True
+            )
 
+        self._backbone_repo = backbone_repo
+        
         self._load_backbone(backbone_repo, backbone_device)
 
         self._load_codec(codec_repo, codec_device)
@@ -229,8 +234,7 @@ class NeuTTS:
         if self._is_quantized_model:
             output_str = self._infer_ggml(ref_codes, ref_text, text)
         else:
-            prompt_ids = self._apply_chat_template(ref_codes, ref_text, text)
-            output_str = self._infer_torch(prompt_ids)
+            output_str = self._infer_torch(ref_codes, ref_text, text)
 
         # Decode
         wav = self._decode(output_str)
@@ -263,14 +267,40 @@ class NeuTTS:
         else:
             raise NotImplementedError("Streaming is not implemented for the torch backend!")
 
-    def encode_reference(self, ref_audio_path: str | Path):
-        wav, _ = librosa.load(ref_audio_path, sr=16000, mono=True)
-        wav_tensor = torch.from_numpy(wav).float().unsqueeze(0).unsqueeze(0)  # [1, 1, T]
-        with torch.no_grad():
-            ref_codes = self.codec.encode_code(audio_or_path=wav_tensor).squeeze(0).squeeze(0)
+    @torch.no_grad()
+    def encode(self, ref_audio_path: str | Path):
+        """
+        Encodes a reference audio file into discrete speech token indices.
+
+        Args:
+            ref_audio_path (str | Path): Path to the reference audio file.
+        Returns:
+            torch.Tensor: 1D tensor of integer speech token indices.
+        """
+        wav, sr = torchaudio.load(ref_audio_path)
+        if wav.shape[0] > 1:
+            wav = wav.mean(dim=0, keepdim=True)
+        if sr != 16000:
+            wav = torchaudio.functional.resample(wav, sr, 16000)
+        wav_tensor = wav.float().unsqueeze(0)  # [1, 1, T]
+        ref_codes = self.codec.encode_code(audio_or_path=wav_tensor).squeeze(0).squeeze(0)
         return ref_codes
+    
+    def encode_reference(self, ref_audio_path: str | Path):
+        """Kept for backwards capabilities"""
+        return self.encode(ref_audio_path)
 
     def _decode(self, codes: str):
+        """
+        Decodes a string of speech tokens into a waveform.
+
+        Args:
+            codes (str): String containing speech tokens in the format `<|speech_N|>`.
+        Returns:
+            np.ndarray: 1D float32 audio waveform.
+        Raises:
+            ValueError: If no valid speech tokens are found in the input string.
+        """
 
         # Extract speech token IDs using regex
         speech_ids = [int(num) for num in re.findall(r"<\|speech_(\d+)\|>", codes)]
@@ -302,38 +332,31 @@ class NeuTTS:
 
     def _apply_chat_template(
         self, ref_codes: list[int], ref_text: str, input_text: str
-    ) -> list[int]:
-
-        input_text = self._to_phones(ref_text) + " " + self._to_phones(input_text)
-        speech_replace = self.tokenizer.convert_tokens_to_ids("<|SPEECH_REPLACE|>")
-        speech_gen_start = self.tokenizer.convert_tokens_to_ids("<|SPEECH_GENERATION_START|>")
-        text_replace = self.tokenizer.convert_tokens_to_ids("<|TEXT_REPLACE|>")
-        text_prompt_start = self.tokenizer.convert_tokens_to_ids("<|TEXT_PROMPT_START|>")
-        text_prompt_end = self.tokenizer.convert_tokens_to_ids("<|TEXT_PROMPT_END|>")
-
-        input_ids = self.tokenizer.encode(input_text, add_special_tokens=False)
-        chat = """user: Convert the text to speech:<|TEXT_REPLACE|>\nassistant:<|SPEECH_REPLACE|>"""
-        ids = self.tokenizer.encode(chat)
-
-        text_replace_idx = ids.index(text_replace)
-        ids = (
-            ids[:text_replace_idx]
-            + [text_prompt_start]
-            + input_ids
-            + [text_prompt_end]
-            + ids[text_replace_idx + 1 :]  # noqa
-        )
-
-        speech_replace_idx = ids.index(speech_replace)
+    ) -> str:
         codes_str = "".join([f"<|speech_{i}|>" for i in ref_codes])
-        codes = self.tokenizer.encode(codes_str, add_special_tokens=False)
-        ids = ids[:speech_replace_idx] + [speech_gen_start] + list(codes)
+        
+        # only do this step for phoneme based models
+        # TODO: Modify branching condition
+        if "qwen3" not in self._backbone_repo:
+            # use old template
+            ref_text = self._to_phones(ref_text)
+            input_text = self._to_phones(input_text)
+            prompt = f"""user: Convert the text to speech:{ref_text} {input_text}\nassistant:{codes_str}"""
 
-        return ids
+        else:
+            messages = [{"role": "user", "content": f"{ref_text} {input_text}"}, {"role": "assistant", "content": codes_str}]
+            prompt = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=False
+            )
 
-    def _infer_torch(self, prompt_ids: list[int]) -> str:
+        return prompt
+
+    def _infer_torch(self, ref_codes: list[int], ref_text: str, text: str) -> str:
+        
+        prompt = self._apply_chat_template(ref_codes, ref_text, text)
+        prompt_ids = self.tokenizer.encode(prompt)
         prompt_tensor = torch.tensor(prompt_ids).unsqueeze(0).to(self.backbone.device)
-        speech_end_id = self.tokenizer.convert_tokens_to_ids("<|SPEECH_GENERATION_END|>")
+        speech_end_id = self.tokenizer.encode("<|SPEECH_GENERATION_END|>")
         with torch.no_grad():
             output_tokens = self.backbone.generate(
                 prompt_tensor,
@@ -352,14 +375,25 @@ class NeuTTS:
         return output_str
 
     def _infer_ggml(self, ref_codes: list[int], ref_text: str, input_text: str) -> str:
-        ref_text = self._to_phones(ref_text)
-        input_text = self._to_phones(input_text)
-
         codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
-        prompt = (
-            f"user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}"
-            f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
-        )
+        
+        # TODO: Modify branching condition
+        if "qwen3" not in self._backbone_repo:
+            # old prompt
+            ref_text = self._to_phones(ref_text)
+            input_text = self._to_phones(input_text)
+            prompt = (
+                f"user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}"
+                f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
+            )
+        
+        # new prompt
+        else:
+            prompt = (
+                f"<|TEXT_PROMPT_START|>{ref_text} {input_text}"
+                f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
+            )
+            
         output = self.backbone(
             prompt,
             max_tokens=self.max_context,
@@ -373,14 +407,25 @@ class NeuTTS:
     def _infer_stream_ggml(
         self, ref_codes: torch.Tensor, ref_text: str, input_text: str
     ) -> Generator[np.ndarray, None, None]:
-        ref_text = self._to_phones(ref_text)
-        input_text = self._to_phones(input_text)
-
+        
         codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
-        prompt = (
-            f"user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}"
-            f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
-        )
+        
+        # TODO: Modify branching condition
+        if "qwen3" not in self._backbone_repo:
+            # old prompt
+            ref_text = self._to_phones(ref_text)
+            input_text = self._to_phones(input_text)
+            prompt = (
+                f"user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}"
+                f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
+            )
+        
+        # new prompt
+        else:
+            prompt = (
+                f"<|TEXT_PROMPT_START|>{ref_text} {input_text}"
+                f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
+            )
 
         audio_cache: list[np.ndarray] = []
         token_cache: list[str] = [f"<|speech_{idx}|>" for idx in ref_codes]
@@ -395,7 +440,7 @@ class NeuTTS:
             stop=["<|SPEECH_GENERATION_END|>"],
             stream=True,
         ):
-            output_str = item["choices"][0]["text"]
+            output_str = item["choices"][0]["text"] 
             token_cache.append(output_str)
 
             if (
