@@ -1,5 +1,6 @@
 import os
 import random
+import time
 from typing import Generator
 from pathlib import Path
 import librosa
@@ -224,34 +225,42 @@ class NeuTTS:
                     " 'neuphonic/neucodec-onnx-decoder'."
                 )
 
-    def infer(self, text: str, ref_codes: np.ndarray | torch.Tensor, ref_text: str) -> np.ndarray:
-        """
-        Perform inference to generate speech from text using the TTS model and reference audio.
+    def infer(self, text: str, ref_codes, ref_text: str) -> np.ndarray:
+        total_start = time.time()
 
-        Args:
-            text (str): Input text to be converted to speech.
-            ref_codes (np.ndarray | torch.tensor): Encoded reference.
-            ref_text (str): Reference text for reference audio. Defaults to None.
-        Returns:
-            np.ndarray: Generated speech waveform.
-        """
-
-        # Generate tokens
+        
+        # Generate speech tokens
+        token_start = time.time()
         if self._is_quantized_model:
             output_str = self._infer_ggml(ref_codes, ref_text, text)
         else:
             prompt_ids = self._apply_chat_template(ref_codes, ref_text, text)
             output_str = self._infer_torch(prompt_ids)
+        token_end = time.time()
 
-        # Decode
+        print(f"[NeuTTS] token generation time: {token_end - token_start:.3f}s")
+        print(f"[NeuTTS] generated token string length: {len(output_str)}")
+
+        # Decode tokens into waveform
+        decode_start = time.time()
         wav = self._decode(output_str)
-        watermarked_wav = (
-            wav
-            if self.watermarker is None
-            else self.watermarker.apply_watermark(wav, sample_rate=24_000)
-        )
+        decode_end = time.time()
+
+        print(f"[NeuTTS] decode time: {decode_end - decode_start:.3f}s")
+        print(f"[NeuTTS] waveform shape: {wav.shape}")
+
+        # Apply watermark if available
+        if self.watermarker is None:
+            watermarked_wav = wav
+        else:
+            watermarked_wav = self.watermarker.apply_watermark(wav, sample_rate=24_000)
+
+        total_end = time.time()
+        print(f"[NeuTTS] total inference time: {total_end - total_start:.3f}s")
 
         return watermarked_wav
+
+
 
     def infer_stream(
         self, text: str, ref_codes: np.ndarray | torch.Tensor, ref_text: str
