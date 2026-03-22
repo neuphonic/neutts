@@ -1,4 +1,4 @@
-# MacOS
+ # MacOS
 **.DS_Store
 
 # Emacs
@@ -211,5 +211,4 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-output.wav
 output.wav
