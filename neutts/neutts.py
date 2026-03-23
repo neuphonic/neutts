@@ -136,6 +136,44 @@ class NeuTTS:
         else:
             self.phonemizer = BasePhonemizer(language_code=language)
 
+    _DEFAULT_CHAT_TEMPLATE = (
+        "{% for message in messages %}"
+        "{% if message['role'] == 'user' %}user: Convert the text to speech:{{ message['content'] }}"
+        "{% elif message['role'] == 'assistant' %}\nassistant:{{ message['content'] }}"
+        "{% endif %}"
+        "{% endfor %}"
+        "{% if add_generation_prompt %}\nassistant:{% endif %}"
+    )
+
+    def _setup_ggml_template(self):
+        import jinja2
+
+        template_str = self.backbone.metadata.get(
+            "tokenizer.chat_template", self._DEFAULT_CHAT_TEMPLATE
+        )
+
+        bos_id = self.backbone.metadata.get("tokenizer.ggml.bos_token_id")
+        eos_id = self.backbone.metadata.get("tokenizer.ggml.eos_token_id")
+        self._ggml_bos_token = self.backbone.detokenize([int(bos_id)]).decode("utf-8") if bos_id else ""
+        self._ggml_eos_token = self.backbone.detokenize([int(eos_id)]).decode("utf-8") if eos_id else ""
+
+        env = jinja2.Environment(
+            loader=jinja2.BaseLoader(),
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+        self._ggml_template = env.from_string(template_str)
+
+    def _format_ggml_prompt(self, user_content: str, assistant_prefix: str) -> str:
+        """Render the chat template for the user turn, then append the assistant prefix."""
+        user_prompt = self._ggml_template.render(
+            messages=[{"role": "user", "content": user_content}],
+            bos_token=self._ggml_bos_token,
+            eos_token=self._ggml_eos_token,
+            add_generation_prompt=True,
+        )
+        return user_prompt + assistant_prefix
+
     def _load_backbone(self, backbone_repo, backbone_device):
         print(f"Loading backbone from: {backbone_repo} on {backbone_device} ...")
 
@@ -176,6 +214,7 @@ class NeuTTS:
                 )
 
             self._is_quantized_model = True
+            self._setup_ggml_template()
 
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(backbone_repo)
@@ -387,24 +426,16 @@ class NeuTTS:
 
     def _infer_ggml(self, ref_codes: list[int], ref_text: str, input_text: str) -> str:
         codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
-        
+
         # TODO: Modify branching condition
         if "qwen3" not in self._backbone_repo:
-            # old prompt
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
-            prompt = (
-                f"user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}"
-                f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
-            )
-        
-        # new prompt
-        else:
-            prompt = (
-                f"<|TEXT_PROMPT_START|>{ref_text} {input_text}"
-                f"<|TEXT_PROMPT_END|><|SPEECH_GENERATION_START|>{codes_str}"
-            )
-            
+
+        prompt = self._format_ggml_prompt(
+            user_content=f"<|TEXT_PROMPT_START|>{ref_text} {input_text}<|TEXT_PROMPT_END|>",
+            assistant_prefix=f"<|SPEECH_GENERATION_START|>{codes_str}",
+        )
         output = self.backbone(
             prompt,
             max_tokens=self.max_context,
@@ -412,47 +443,41 @@ class NeuTTS:
             top_k=50,
             stop=["<|SPEECH_GENERATION_END|>"],
         )
-        output_str = output["choices"][0]["text"]
-        return output_str
+        return output["choices"][0]["text"]
 
     def _infer_stream_ggml(
         self, ref_codes: torch.Tensor, ref_text: str, input_text: str
     ) -> Generator[np.ndarray, None, None]:
-        
+
         codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
-        
+
         # TODO: Modify branching condition
         if "qwen3" not in self._backbone_repo:
-            # old prompt
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
-            prompt = (
-                f"user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}"
-                f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
-            )
-        
-        # new prompt
-        else:
-            prompt = (
-                f"<|TEXT_PROMPT_START|>{ref_text} {input_text}"
-                f"<|TEXT_PROMPT_END|><|SPEECH_GENERATION_START|>{codes_str}"
-            )
 
-        audio_cache: list[np.ndarray] = []
-        token_cache: list[str] = [f"<|speech_{idx}|>" for idx in ref_codes]
-        n_decoded_samples: int = 0
-        n_decoded_tokens: int = len(ref_codes)
-
-        for item in self.backbone(
+        prompt = self._format_ggml_prompt(
+            user_content=f"<|TEXT_PROMPT_START|>{ref_text} {input_text}<|TEXT_PROMPT_END|>",
+            assistant_prefix=f"<|SPEECH_GENERATION_START|>{codes_str}",
+        )
+        stream = self.backbone(
             prompt,
             max_tokens=self.max_context,
             temperature=1.0,
             top_k=50,
             stop=["<|SPEECH_GENERATION_END|>"],
             stream=True,
-        ):
-            output_str = item["choices"][0]["text"] 
-            token_cache.append(output_str)
+        )
+
+        audio_cache: list[np.ndarray] = []
+        token_cache: list[str] = [f"<|speech_{idx}|>" for idx in ref_codes]
+        n_decoded_samples: int = 0
+        n_decoded_tokens: int = len(ref_codes)
+
+        for item in stream:
+            output_str = item["choices"][0]["text"]
+            if output_str:
+                token_cache.append(output_str)
 
             if (
                 len(token_cache[n_decoded_tokens:])
