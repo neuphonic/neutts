@@ -367,7 +367,7 @@ class NeuTTS:
         prompt = self._apply_chat_template(ref_codes, ref_text, text)
         prompt_ids = self.tokenizer.encode(prompt)
         prompt_tensor = torch.tensor(prompt_ids).unsqueeze(0).to(self.backbone.device)
-        speech_end_id = self.tokenizer.encode("<|SPEECH_GENERATION_END|>")
+        speech_end_id = self.tokenizer.convert_tokens_to_ids("<|SPEECH_GENERATION_END|>")
         with torch.no_grad():
             output_tokens = self.backbone.generate(
                 prompt_tensor,
