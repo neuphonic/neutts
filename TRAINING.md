@@ -11,7 +11,7 @@ You can prepare your own dataset by following these steps:
 
 1. Encode your audio files using the [NeuCodec](https://huggingface.co/neuphonic/neucodec) model into a format similar to the [Emilia-YODAS dataset](https://huggingface.co/datasets/neuphonic/emilia-yodas-english-neucodec).
 2. Setup your configuration file similar to the [example config](/examples/finetune_config.yaml).
-3. Check and modify the phonemizer and the tokenizer in the script such that they suit your dataset/task. See [the phonemizer documentation](https://bootphon.github.io/phonemizer/api_reference.html#phonemizer.backend.espeak.espeak.EspeakBackend) for phonemizer arguments. 
+3. Check and modify the phonemizer and the tokenizer in the script such that they suit your dataset/task. See [the phonemizer documentation](https://bootphon.github.io/phonemizer/api_reference.html#phonemizer.backend.espeak.espeak.EspeakBackend) for phonemizer arguments.
 4. Run the finetuning script with your dataset and configuration file. To do this, navigate to the base directory of your cloned repo in the terminal and run:
 
     ```bash

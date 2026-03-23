@@ -38,7 +38,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="NeuTTS Example")
     parser.add_argument(
-        "--input_text", type=str, required=True, help="Input text to be converted to speech"
+        "--input_text",
+        type=str,
+        required=True,
+        help="Input text to be converted to speech",
     )
     parser.add_argument(
         "--ref_codes",
@@ -53,7 +56,10 @@ if __name__ == "__main__":
         help="Reference text corresponding to the reference audio",
     )
     parser.add_argument(
-        "--output_path", type=str, default="output.wav", help="Path to save the output audio"
+        "--output_path",
+        type=str,
+        default="output.wav",
+        help="Path to save the output audio",
     )
     parser.add_argument(
         "--backbone",

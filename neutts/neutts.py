@@ -1,48 +1,43 @@
 import os
+import random
 from typing import Generator
 from pathlib import Path
 import numpy as np
 import torch
 import torchaudio
 import re
-import platform
-import glob
 import warnings
-from phonemizer.backend import EspeakBackend
 from neucodec import NeuCodec, DistillNeuCodec
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from .phonemizers import BasePhonemizer, CUSTOM_PHONEMIZERS
 
 
-def _configure_espeak_library():
-    """Auto-detect and configure espeak library on macOS."""
-    if platform.system() != "Darwin":
-        return  # Only needed on macOS
-
-    # Common Homebrew installation paths
-    search_paths = [
-        "/opt/homebrew/Cellar/espeak/*/lib/libespeak.*.dylib",  # Apple Silicon
-        "/usr/local/Cellar/espeak/*/lib/libespeak.*.dylib",  # Intel
-        "/opt/homebrew/Cellar/espeak-ng/*/lib/libespeak-ng.*.dylib",  # Apple Silicon
-        "/usr/local/Cellar/espeak-ng/*/lib/libespeak-ng.*.dylib",
-    ]
-
-    for pattern in search_paths:
-        matches = glob.glob(pattern)
-        if matches:
-            try:
-                from phonemizer.backend.espeak.wrapper import EspeakWrapper
-
-                EspeakWrapper.set_library(matches[0])
-                return
-            except Exception:
-                # If this fails, phonemizer will try its default detection
-                pass
+BACKBONE_LANGUAGE_MAP = {
+    # en models
+    "neuphonic/neutts-air": "en-us",
+    "neuphonic/neutts-air-q4-gguf": "en-us",
+    "neuphonic/neutts-air-q8-gguf": "en-us",
+    "neuphonic/neutts-nano": "en-us",
+    "neuphonic/neutts-nano-q4-gguf": "en-us",
+    "neuphonic/neutts-nano-q8-gguf": "en-us",
+    # de models
+    "neuphonic/neutts-nano-german": "de",
+    "neuphonic/neutts-nano-german-q4-gguf": "de",
+    "neuphonic/neutts-nano-german-q8-gguf": "de",
+    # fr models
+    "neuphonic/neutts-nano-french": "fr-fr",
+    "neuphonic/neutts-nano-french-q4-gguf": "fr-fr",
+    "neuphonic/neutts-nano-french-q8-gguf": "fr-fr",
+    # es models
+    "neuphonic/neutts-nano-spanish": "es",
+    "neuphonic/neutts-nano-spanish-q4-gguf": "es",
+    "neuphonic/neutts-nano-spanish-q8-gguf": "es",
+}
 
 
-
-
-
-def _linear_overlap_add(frames: list[np.ndarray], stride: int) -> np.ndarray:
+def _linear_overlap_add(
+    frames: list[np.ndarray], stride: int, power: float = 1.0
+) -> np.ndarray:
     # original impl --> https://github.com/facebookresearch/encodec/blob/main/encodec/utils.py
     assert len(frames)
     dtype = frames[0].dtype
@@ -54,17 +49,20 @@ def _linear_overlap_add(frames: list[np.ndarray], stride: int) -> np.ndarray:
         total_size = max(total_size, frame_end)
 
     sum_weight = np.zeros(total_size, dtype=dtype)
-    out = np.zeros(*shape, total_size, dtype=dtype)
+
+    out = np.zeros((*shape, total_size), dtype=dtype)
 
     offset: int = 0
     for frame in frames:
         frame_length = frame.shape[-1]
         t = np.linspace(0, 1, frame_length + 2, dtype=dtype)[1:-1]
-        weight = np.abs(0.5 - (t - 0.5))
+
+        weight = (0.5 - np.abs(t - 0.5)) ** power
 
         out[..., offset : offset + frame_length] += weight * frame
         sum_weight[offset : offset + frame_length] += weight
         offset += stride
+
     assert sum_weight.min() > 0
     return out / sum_weight
 
@@ -77,6 +75,7 @@ class NeuTTS:
         backbone_device="cpu",
         codec_repo="neuphonic/neucodec",
         codec_device="cpu",
+        language=None,
     ):
 
         # Consts
@@ -101,10 +100,7 @@ class NeuTTS:
         # Call before using phonemizer 
         # TODO: Modify branching condition
         if "qwen3" not in backbone_repo:
-            _configure_espeak_library()
-            self.phonemizer = EspeakBackend(
-                language="en-us", preserve_punctuation=True, with_stress=True
-            )
+            self._load_phonemizer(language, backbone_repo)
 
         self._backbone_repo = backbone_repo
         
@@ -117,7 +113,7 @@ class NeuTTS:
             import perth
 
             self.watermarker = perth.PerthImplicitWatermarker()
-        except (ImportError, AttributeError) as e:
+        except (ImportError, AttributeError, TypeError) as e:
             warnings.warn(
                 f"Perth watermarking unavailable: {e}. "
                 "Audio will not be watermarked. "
@@ -125,10 +121,24 @@ class NeuTTS:
             )
             self.watermarker = None
 
+    def _load_phonemizer(self, language, backbone_repo):
+        if not language:
+            if BACKBONE_LANGUAGE_MAP.get(backbone_repo) is not None:
+                language = BACKBONE_LANGUAGE_MAP[backbone_repo]
+            else:
+                raise ValueError(
+                    "If you aren't using a Neuphonic model, make sure to specify any "
+                    "eSpeak language code as the `language` parameter."
+                )
+
+        if language in CUSTOM_PHONEMIZERS:
+            self.phonemizer = CUSTOM_PHONEMIZERS[language]
+        else:
+            self.phonemizer = BasePhonemizer(language_code=language)
+
     def _load_backbone(self, backbone_repo, backbone_device):
         print(f"Loading backbone from: {backbone_repo} on {backbone_device} ...")
 
-        # GGUF loading
         if backbone_repo.endswith("gguf"):
 
             try:
@@ -140,7 +150,9 @@ class NeuTTS:
                     "    pip install llama-cpp-python"
                 ) from e
 
-            # If backbone_repo is a local file path, load it directly with llama.cpp
+            seed = random.randint(0, 2**32)
+            print(f"Using seed {seed}")
+
             if os.path.isfile(backbone_repo):
                 self.backbone = Llama(
                     model_path=backbone_repo,
@@ -149,9 +161,9 @@ class NeuTTS:
                     n_ctx=self.max_context,
                     mlock=True,
                     flash_attn=True if backbone_device == "gpu" else False,
+                    seed=seed,
                 )
             else:
-                # Fallback: treat it as a HF repo id (keeps original behavior if ever needed)
                 self.backbone = Llama.from_pretrained(
                     repo_id=backbone_repo,
                     filename="*.gguf",
@@ -160,6 +172,7 @@ class NeuTTS:
                     n_ctx=self.max_context,
                     mlock=True,
                     flash_attn=True if backbone_device == "gpu" else False,
+                    seed=seed,
                 )
 
             self._is_quantized_model = True
@@ -174,7 +187,6 @@ class NeuTTS:
 
         print(f"Loading codec from: {codec_repo} on {codec_device} ...")
 
-        # 1) Local ONNX path (offline, recommended for embedded)
         if codec_repo.endswith(".onnx") and os.path.isfile(codec_repo):
             try:
                 from neucodec import NeuCodecOnnxDecoder
@@ -187,7 +199,6 @@ class NeuTTS:
             self.codec = NeuCodecOnnxDecoder(codec_repo)
             self._is_onnx_codec = True
 
-        # 2) Original HF-based behavior (use only if you really want remote download)
         match codec_repo:
             case "neuphonic/neucodec":
                 self.codec = NeuCodec.from_pretrained(codec_repo)
@@ -195,7 +206,7 @@ class NeuTTS:
             case "neuphonic/distill-neucodec":
                 self.codec = DistillNeuCodec.from_pretrained(codec_repo)
                 self.codec.eval().to(codec_device)
-            case "neuphonic/neucodec-onnx-decoder":
+            case "neuphonic/neucodec-onnx-decoder" | "neuphonic/neucodec-onnx-decoder-int8":
 
                 if codec_device != "cpu":
                     raise ValueError("Onnx decoder only currently runs on CPU.")

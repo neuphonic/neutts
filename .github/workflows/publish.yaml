@@ -1,0 +1,33 @@
+name: Publish to PyPi
+
+on:
+  workflow_dispatch: # Allows manual triggering from the GitHub UI
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        export PATH="$HOME/.local/bin:$PATH"
+
+    - name: Install dependencies
+      run: |
+        poetry install
+
+    - name: Set up PyPi repo and token
+      run: |
+        poetry config repositories.pypi https://upload.pypi.org/legacy/
+        poetry config http-basic.pypi __token__ ${{ secrets.PYPI_TOKEN }}
+
+    - name: Publish package
+      run: |
+        poetry publish --build --repository pypi

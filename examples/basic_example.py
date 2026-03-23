@@ -1,6 +1,7 @@
 import os
 import soundfile as sf
 from neutts import NeuTTS
+import torch
 
 
 def main(input_text, ref_audio_path, ref_text, backbone, output_path="output.wav"):
@@ -21,8 +22,13 @@ def main(input_text, ref_audio_path, ref_text, backbone, output_path="output.wav
         with open(ref_text, "r") as f:
             ref_text = f.read().strip()
 
-    print("Encoding reference audio")
-    ref_codes = tts.encode(ref_audio_path)
+    if not os.path.exists(ref_audio_path.replace(".wav", ".pt")):
+        print("Encoding reference audio")
+        ref_codes = tts.encode(ref_audio_path)
+        torch.save(ref_codes, ref_audio_path.replace(".wav", ".pt"))
+    else:
+        print("Loading pre-encoded reference audio")
+        ref_codes = torch.load(ref_audio_path.replace(".wav", ".pt"))
 
     print(f"Generating audio for input text: {input_text}")
     wav = tts.infer(input_text, ref_codes, ref_text)
@@ -37,7 +43,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="NeuTTS Example")
     parser.add_argument(
-        "--input_text", type=str, required=True, help="Input text to be converted to speech"
+        "--input_text",
+        type=str,
+        required=True,
+        help="Input text to be converted to speech",
     )
     parser.add_argument(
         "--ref_audio", type=str, default="./samples/jo.wav", help="Path to reference audio file"
@@ -49,7 +58,10 @@ if __name__ == "__main__":
         help="Reference text corresponding to the reference audio",
     )
     parser.add_argument(
-        "--output_path", type=str, default="output.wav", help="Path to save the output audio"
+        "--output_path",
+        type=str,
+        default="output.wav",
+        help="Path to save the output audio",
     )
     parser.add_argument(
         "--backbone",
