@@ -5,7 +5,6 @@ import warnings
 from pathlib import Path
 from typing import Generator
 
-import jinja2
 import numpy as np
 import torch
 import torchaudio
@@ -286,6 +285,8 @@ class NeuTTS:
         - ``self._ggml_template``: compiled Jinja2 template object.
         - ``self._ggml_bos_token`` / ``self._ggml_eos_token``: token strings.
         """
+        import jinja2
+
         template_str = self.backbone.metadata.get(
             "tokenizer.chat_template", self._DEFAULT_CHAT_TEMPLATE
         )
