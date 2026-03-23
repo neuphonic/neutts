@@ -96,15 +96,13 @@ class NeuTTS:
         self.tokenizer = None
 
         # Load phonemizer + models
-        print("Loading phonemizer...")
-        # Call before using phonemizer 
-        # TODO: Modify branching condition
-        if "qwen3" not in backbone_repo:
-            self._load_phonemizer(language, backbone_repo)
-
         self._backbone_repo = backbone_repo
         
         self._load_backbone(backbone_repo, backbone_device)
+
+        if self.input_format == "phonemes":
+            print("Loading phonemizer...")
+            self._load_phonemizer(language, backbone_repo)
 
         self._load_codec(codec_repo, codec_device)
 
@@ -132,7 +130,7 @@ class NeuTTS:
             ValueError: If ``language`` cannot be determined.
         """
         if not language:
-            if BACKBONE_LANGUAGE_MAP.get(backbone_repo) is not None:
+            if BACKBONE_LANGUAGE_MAP.get(backbone_repo):
                 language = BACKBONE_LANGUAGE_MAP[backbone_repo]
             else:
                 raise ValueError(
@@ -196,12 +194,15 @@ class NeuTTS:
 
             self._is_quantized_model = True
             self._setup_ggml_template()
+            self.input_format = self.backbone.metadata.get("neuphonic.input_format", "phonemes")
 
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(backbone_repo)
             self.backbone = AutoModelForCausalLM.from_pretrained(backbone_repo).to(
                 torch.device(backbone_device)
             )
+            neuphonic_cfg = getattr(self.backbone.config, "neuphonic", {}) or {}
+            self.input_format = neuphonic_cfg.get("input_format", "phonemes")
 
     def _load_codec(self, codec_repo: str, codec_device: str) -> None:
         """Load the neural codec used to encode and decode speech tokens.
@@ -344,8 +345,7 @@ class NeuTTS:
         """
         codes_str = "".join([f"<|speech_{i}|>" for i in ref_codes])
 
-        # TODO: Modify branching condition
-        if "qwen3" not in self._backbone_repo:
+        if self.input_format is "phonemes":
             # use old template
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
@@ -501,8 +501,7 @@ class NeuTTS:
         """
         codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
 
-        # TODO: Modify branching condition
-        if "qwen3" not in self._backbone_repo:
+        if self.input_format is "phonemes":
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
 
@@ -581,8 +580,7 @@ class NeuTTS:
         """
         codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
 
-        # TODO: Modify branching condition
-        if "qwen3" not in self._backbone_repo:
+        if self.input_format is "phonemes":
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
 
