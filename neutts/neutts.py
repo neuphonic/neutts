@@ -402,7 +402,7 @@ class NeuTTS:
         else:
             prompt = (
                 f"<|TEXT_PROMPT_START|>{ref_text} {input_text}"
-                f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
+                f"<|TEXT_PROMPT_END|><|SPEECH_GENERATION_START|>{codes_str}"
             )
             
         output = self.backbone(
@@ -435,7 +435,7 @@ class NeuTTS:
         else:
             prompt = (
                 f"<|TEXT_PROMPT_START|>{ref_text} {input_text}"
-                f"<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"
+                f"<|TEXT_PROMPT_END|><|SPEECH_GENERATION_START|>{codes_str}"
             )
 
         audio_cache: list[np.ndarray] = []
