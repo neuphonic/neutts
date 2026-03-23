@@ -345,7 +345,7 @@ class NeuTTS:
         """
         codes_str = "".join([f"<|speech_{i}|>" for i in ref_codes])
 
-        if self.input_format is "phonemes":
+        if self.input_format == "phonemes":
             # use old template
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
@@ -501,7 +501,7 @@ class NeuTTS:
         """
         codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
 
-        if self.input_format is "phonemes":
+        if self.input_format == "phonemes":
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
 
@@ -580,7 +580,7 @@ class NeuTTS:
         """
         codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
 
-        if self.input_format is "phonemes":
+        if self.input_format == "phonemes":
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
 
