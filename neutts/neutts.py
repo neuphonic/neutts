@@ -38,6 +38,25 @@ BACKBONE_LANGUAGE_MAP = {
     "neuphonic/neutts-nano-spanish-q8-gguf": "es",
 }
 
+# Maps English language names to their eSpeak code and lang-token string.
+# Used for multilingual model validation and prompt formatting.
+# fmt: off
+LANG_INFO = {
+    "french":     {"code": "fr-fr", "token": "<|FR|>"},
+    "german":     {"code": "de",    "token": "<|DE|>"},
+    "english":    {"code": "en-us", "token": "<|EN|>"},
+    "spanish":    {"code": "es",    "token": "<|ES|>"},
+    "catalan":    {"code": "ca",    "token": "<|CA|>"},
+    "dutch":      {"code": "nl",    "token": "<|NL|>"},
+    "italian":    {"code": "it",    "token": "<|IT|>"},
+    "portuguese": {"code": "pt",    "token": "<|PT|>"},
+    "japanese":   {"code": "ja",    "token": "<|JA|>"},
+    "korean":     {"code": "ko",    "token": "<|KO|>"},
+    "chinese":    {"code": "zh",    "token": "<|ZH|>"},
+    "urdu":       {"code": "ur",    "token": "<|UR|>"},
+}
+# fmt: on
+
 
 class NeuTTS:
     """Neural text-to-speech model combining a language model backbone with a neural codec.
@@ -47,7 +66,7 @@ class NeuTTS:
     """
 
     # Fallback Jinja2 chat template for GGUF models that do not embed their
-    # own template in the GGUF metadata. 
+    # own template in the GGUF metadata.
     _DEFAULT_CHAT_TEMPLATE = (
         "{% for message in messages %}"
         "{% if message['role'] == 'user' %}user: Convert the text to speech:<|TEXT_PROMPT_START|>{{ message['content'] }}<|TEXT_PROMPT_END|>"
@@ -55,6 +74,22 @@ class NeuTTS:
         "{% endif %}"
         "{% endfor %}"
         "{% if add_generation_prompt %}\nassistant:{% endif %}"
+    )
+
+    # Chat template for multilingual torch models.
+    _MULTILINGUAL_CHAT_TEMPLATE = (
+        "{%- for message in messages -%}"
+        '{%- if message["role"] == "system" -%}'
+        '{{- message["content"] -}}'
+        '{%- elif message["role"] == "user" -%}'
+        '{{- "<|TEXT_PROMPT_START|>" -}}'
+        '{{- message["content"] -}}'
+        '{{- "<|TEXT_PROMPT_END|>" -}}'
+        '{%- elif message["role"] == "assistant" -%}'
+        '{{- "<|SPEECH_GENERATION_START|>" -}}'
+        '{{- message["content"] -}}'
+        "{%- endif -%}"
+        "{%- endfor -%}"
     )
 
     def __init__(
@@ -75,8 +110,9 @@ class NeuTTS:
             codec_repo: HuggingFace repo ID or local ``.onnx`` path for the neural codec.
             codec_device: Device for the codec (``"cpu"`` or ``"cuda"``).
             language: eSpeak language code (e.g. ``"en-us"``, ``"de"``).
-                      Required when ``backbone_repo`` is not in ``BACKBONE_LANGUAGE_MAP``
-                      and the model uses phoneme input.
+                      Required for custom phoneme-input models if ``backbone_repo`` is not
+                      in ``BACKBONE_LANGUAGE_MAP``. Not used for text-input models;
+                      for multilingual models pass ``language`` to :meth:`infer` instead.
         """
         # Streaming / decoding constants
         self.sample_rate = 24_000
@@ -97,12 +133,24 @@ class NeuTTS:
 
         # Load phonemizer + models
         self._backbone_repo = backbone_repo
-        
+        self._supported_langs = (
+            None  # set by _load_backbone for multilingual torch models
+        )
+        self._use_lang_token = (
+            False  # set by _load_backbone for multilingual torch models
+        )
+
         self._load_backbone(backbone_repo, backbone_device)
 
         if self.input_format == "phonemes":
             print("Loading phonemizer...")
             self._load_phonemizer(language, backbone_repo)
+        elif language is not None:
+            warnings.warn(
+                f"Lang code '{language}' was passed to __init__ but this model uses text input "
+                "and does not require a lang code at initialisation. "
+                "Pass `language` to `infer` or `infer_stream` instead."
+            )
 
         self._load_codec(codec_repo, codec_device)
 
@@ -118,7 +166,6 @@ class NeuTTS:
                 "Install with: pip install perth>=0.2.0"
             )
             self.watermarker = None
-
 
     def _load_phonemizer(self, language: str | None, backbone_repo: str) -> None:
         """Load the phonemizer for the given language.
@@ -142,7 +189,7 @@ class NeuTTS:
             self.phonemizer = CUSTOM_PHONEMIZERS[language]
         else:
             self.phonemizer = BasePhonemizer(language_code=language)
-    
+
     def _load_backbone(self, backbone_repo: str, backbone_device: str) -> None:
         """Load the LLM backbone — either a GGUF model or a HuggingFace model.
 
@@ -150,9 +197,18 @@ class NeuTTS:
         llama-cpp-python and support CPU/GPU offloading and streaming inference.
         All other repos are loaded via ``transformers``.
 
+        For torch models, the ``neuphonic`` config block (if present) is read to
+        populate ``self.input_format``, ``self._supported_langs``, and
+        ``self._use_lang_token``. If the block is present, all three keys
+        ``supported_langs``, ``use_lang_token``, and ``use_cfg`` must be set.
+
         Args:
             backbone_repo: HuggingFace repo ID or local file path.
             backbone_device: ``"cpu"`` or ``"gpu"``.
+        Raises:
+            ValueError: If the ``neuphonic`` config block is present but missing
+                        required keys.
+            NotImplementedError: If the model config sets ``use_cfg`` to ``True``.
         """
         print(f"Loading backbone from: {backbone_repo} on {backbone_device} ...")
 
@@ -203,6 +259,23 @@ class NeuTTS:
             )
             neuphonic_cfg = getattr(self.backbone.config, "neuphonic", {}) or {}
             self.input_format = neuphonic_cfg.get("input_format", "phonemes")
+            self._supported_langs = None
+            self._use_lang_token = False
+            if neuphonic_cfg:
+                required_keys = {"supported_langs", "use_lang_token", "use_cfg"}
+                missing = required_keys - neuphonic_cfg.keys()
+                if missing:
+                    raise ValueError(
+                        "Malformed model config: `neuphonic` config must include "
+                        "`supported_langs`, `use_lang_token`, and `use_cfg` — "
+                        f"missing: {sorted(missing)}."
+                    )
+                self._supported_langs = neuphonic_cfg["supported_langs"]
+                self._use_lang_token = neuphonic_cfg["use_lang_token"]
+                if neuphonic_cfg["use_cfg"]:
+                    raise NotImplementedError(
+                        "This model requires CFG inference, which is not currently supported."
+                    )
 
     def _load_codec(self, codec_repo: str, codec_device: str) -> None:
         """Load the neural codec used to encode and decode speech tokens.
@@ -328,51 +401,162 @@ class NeuTTS:
         return user_prompt + assistant_prefix
 
     def _apply_chat_template(
-        self, ref_codes: list[int], ref_text: str, input_text: str
+        self,
+        ref_codes: list[int],
+        ref_text: str,
+        input_text: str,
+        language: str | None = None,
     ) -> str:
         """Build a prompt for torch inference using the HuggingFace chat template.
 
         For phoneme-based models the texts are first converted to phonemes and
-        a simple hand-crafted template is used. For newer models the
-        tokenizer's own ``apply_chat_template`` is called.
+        a simple hand-crafted template is used. For all text-input models the
+        tokenizer's own ``apply_chat_template`` is called, optionally prefixed by
+        a system message carrying the lang token when ``use_lang_token`` is set.
 
         Args:
             ref_codes: Reference speech token indices.
             ref_text: Text corresponding to the reference audio.
             input_text: Text to synthesise.
+            language: English language name (e.g. ``"french"``). Required when
+                      ``use_lang_token`` is True.
         Returns:
             str: Formatted prompt string (not tokenised).
         """
         codes_str = "".join([f"<|speech_{i}|>" for i in ref_codes])
 
         if self.input_format == "phonemes":
-            # use old template
+            # use old template
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
             prompt = f"""user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"""
 
         else:
-            messages = [{"role": "user", "content": f"{ref_text} {input_text}"}, {"role": "assistant", "content": codes_str}]
+            messages = []
+            if self._use_lang_token:
+                lang_token = LANG_INFO[language]["token"]
+                messages.append({"role": "system", "content": lang_token})
+            messages.append({"role": "user", "content": f"{ref_text} {input_text}"})
+            messages.append({"role": "assistant", "content": codes_str})
             prompt = self.tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=False
             )
 
         return prompt
 
-    def infer(self, text: str, ref_codes: np.ndarray | torch.Tensor, ref_text: str) -> np.ndarray:
+    def _validate_language(self, language: str | None) -> None:
+        """Validate ``language`` against the model's language configuration.
+
+        Behaviour varies by model type:
+
+        * Multilingual with ``use_lang_token``: ``language`` is required and must be
+          in ``supported_langs``.
+        * Multilingual without ``use_lang_token``: ``language`` is optional; if
+          provided it must be in ``supported_langs``; if omitted a warning is issued.
+        * Monolingual (no ``supported_langs``): if the model is in
+          ``BACKBONE_LANGUAGE_MAP``, ``language`` is validated against it when
+          provided; if omitted a warning is issued. Custom models are skipped.
+
+        Args:
+            language: English language name (e.g. ``"french"``).
+        Raises:
+            ValueError: On any unsupported or unrecognised language, or when a
+                        required ``language`` is not provided.
+        """
+        if self._supported_langs is not None:
+            supported_names = [
+                name
+                for name, info in LANG_INFO.items()
+                if info["code"] in self._supported_langs
+            ]
+            if self._use_lang_token:
+                # language drives the lang token; it is required
+                if language is None:
+                    raise ValueError(
+                        "This model requires a language token. Please provide a `language` "
+                        f"parameter (one of: {supported_names})."
+                    )
+            else:
+                # language used for validation only
+                if language is None:
+                    warnings.warn(
+                        "No language specified. Ensure your text is in one of the "
+                        f"supported languages: {supported_names}."
+                    )
+                    return
+            if language not in LANG_INFO:
+                raise ValueError(
+                    f"Unknown language '{language}'. "
+                    f"Recognised language names: {list(LANG_INFO.keys())}"
+                )
+            if LANG_INFO[language]["code"] not in self._supported_langs:
+                raise ValueError(
+                    f"Language '{language}' is not supported by this model. "
+                    f"Supported languages: {supported_names}"
+                )
+        else:
+            # monolingual (or unknown) model
+            expected_code = BACKBONE_LANGUAGE_MAP.get(self._backbone_repo)
+            if expected_code is None:
+                # custom model — validate name only if provided
+                if language is not None and language not in LANG_INFO:
+                    raise ValueError(
+                        f"Unknown language '{language}'. "
+                        f"Recognised language names: {list(LANG_INFO.keys())}"
+                    )
+                return
+            expected_name = next(
+                (
+                    name
+                    for name, info in LANG_INFO.items()
+                    if info["code"] == expected_code
+                ),
+                expected_code,
+            )
+            if language is None:
+                warnings.warn(
+                    f"No language specified. This model speaks '{expected_name}'."
+                )
+            else:
+                if language not in LANG_INFO:
+                    raise ValueError(
+                        f"Unknown language '{language}'. "
+                        f"Recognised language names: {list(LANG_INFO.keys())}"
+                    )
+                if LANG_INFO[language]["code"] != expected_code:
+                    raise ValueError(
+                        f"Language '{language}' does not match this model's expected "
+                        f"language ('{expected_name}')."
+                    )
+
+    def infer(
+        self,
+        text: str,
+        ref_codes: np.ndarray | torch.Tensor,
+        ref_text: str,
+        language: str | None = None,
+    ) -> np.ndarray:
         """Synthesise speech from text, conditioned on a reference voice.
 
         Args:
             text: Input text to convert to speech.
             ref_codes: Encoded reference audio produced by :meth:`encode`.
             ref_text: Transcript of the reference audio.
+            language: English language name (e.g. ``"french"``). Required when
+                      ``use_lang_token`` is True; optional but validated for
+                      other multilingual models; informational for monolingual models.
         Returns:
             np.ndarray: 1-D float32 waveform at ``self.sample_rate`` Hz.
+        Raises:
+            ValueError: If ``language`` fails validation (see :meth:`_validate_language`),
+                        or if ``language`` is provided with a GGML backbone (not yet supported).
         """
+        self._validate_language(language)
+
         if self._is_quantized_model:
-            output_str = self._infer_ggml(ref_codes, ref_text, text)
+            output_str = self._infer_ggml(ref_codes, ref_text, text, language=language)
         else:
-            output_str = self._infer_torch(ref_codes, ref_text, text)
+            output_str = self._infer_torch(ref_codes, ref_text, text, language=language)
 
         # Decode
         wav = self._decode(output_str)
@@ -385,7 +569,11 @@ class NeuTTS:
         return watermarked_wav
 
     def infer_stream(
-        self, text: str, ref_codes: np.ndarray | torch.Tensor, ref_text: str
+        self,
+        text: str,
+        ref_codes: np.ndarray | torch.Tensor,
+        ref_text: str,
+        language: str | None = None,
     ) -> Generator[np.ndarray, None, None]:
         """Synthesise speech with streaming output, yielding audio chunks as they are decoded.
 
@@ -395,11 +583,20 @@ class NeuTTS:
             text: Input text to convert to speech.
             ref_codes: Encoded reference audio produced by :meth:`encode`.
             ref_text: Transcript of the reference audio.
+            language: Not yet supported for streaming inference.
         Yields:
             np.ndarray: 1-D float32 audio chunks at ``self.sample_rate`` Hz.
         Raises:
+            ValueError: If ``language`` is provided (not yet supported for streaming).
             NotImplementedError: If called with a torch (non-GGUF) backbone.
         """
+        # TODO: add multilingual support for GGML streaming inference
+        if language is not None:
+            raise ValueError(
+                "Multilingual streaming inference is not yet supported. "
+                "Use `infer` for multilingual synthesis."
+            )
+
         if self._is_quantized_model:
             return self._infer_stream_ggml(ref_codes, ref_text, text)
 
@@ -425,11 +622,10 @@ class NeuTTS:
         wav_tensor = wav.float().unsqueeze(0)  # [1, 1, T]
         ref_codes = self.codec.encode_code(audio_or_path=wav_tensor).squeeze(0).squeeze(0)
         return ref_codes
-    
+
     def encode_reference(self, ref_audio_path: str | Path) -> torch.Tensor:
         """Alias for :meth:`encode` kept for backwards compatibility."""
         return self.encode(ref_audio_path)
-
 
     def _decode(self, codes: str) -> np.ndarray:
         """Decode a string of speech tokens into a waveform.
@@ -458,17 +654,24 @@ class NeuTTS:
 
         return recon[0, 0, :]
 
-    def _infer_torch(self, ref_codes: list[int], ref_text: str, text: str) -> str:
+    def _infer_torch(
+        self,
+        ref_codes: list[int],
+        ref_text: str,
+        text: str,
+        language: str | None = None,
+    ) -> str:
         """Run a single forward pass through the torch backbone.
 
         Args:
             ref_codes: Reference speech token indices.
             ref_text: Transcript of the reference audio.
             text: Input text to synthesise.
+            language: English language name. Required when ``use_lang_token`` is True.
         Returns:
             str: Raw model output containing generated speech tokens.
         """
-        prompt = self._apply_chat_template(ref_codes, ref_text, text)
+        prompt = self._apply_chat_template(ref_codes, ref_text, text, language=language)
         prompt_ids = self.tokenizer.encode(prompt)
         prompt_tensor = torch.tensor(prompt_ids).unsqueeze(0).to(self.backbone.device)
         speech_end_id = self.tokenizer.convert_tokens_to_ids("<|SPEECH_GENERATION_END|>")
@@ -489,16 +692,32 @@ class NeuTTS:
         )
         return output_str
 
-    def _infer_ggml(self, ref_codes: list[int], ref_text: str, input_text: str) -> str:
+    def _infer_ggml(
+        self,
+        ref_codes: list[int],
+        ref_text: str,
+        input_text: str,
+        language: str | None = None,
+    ) -> str:
         """Run a single forward pass through the GGML backbone.
 
         Args:
             ref_codes: Reference speech token indices.
             ref_text: Transcript of the reference audio.
             input_text: Input text to synthesise.
+            language: Not yet supported for GGML inference.
         Returns:
             str: Raw model output containing generated speech tokens.
+        Raises:
+            ValueError: If ``language`` is provided (GGML multilingual not yet supported).
         """
+        # TODO: add multilingual support for GGML inference
+        if language is not None:
+            raise ValueError(
+                "Multilingual GGML inference is not yet supported. "
+                "Use a torch backbone for multilingual synthesis."
+            )
+
         codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
 
         if self.input_format == "phonemes":
