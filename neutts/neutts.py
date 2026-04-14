@@ -1,6 +1,7 @@
 import os
 import re
 import random
+import unicodedata
 import warnings
 from pathlib import Path
 from typing import Generator
@@ -56,6 +57,65 @@ LANG_INFO = {
     "urdu":       {"code": "ur",    "token": "<|UR|>"},
 }
 # fmt: on
+
+_QUOTE_MAP = str.maketrans(
+    {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+    }
+)
+
+# Lazily-initialised CJK frontends — shared across all NeuTTS instances.
+_FRONTENDS: dict = {}
+
+
+def _get_text_frontend(language: str):
+    """Return the text frontend for *language*, instantiating it on first use.
+
+    Returns ``None`` for languages that do not need a specialised frontend.
+    Raises ``ImportError`` if the required CJK dependency is not installed.
+    """
+    if language not in _FRONTENDS:
+        if language == "japanese":
+            try:
+                from .preprocessing import JAFrontend  # noqa: PLC0415
+            except ImportError as e:
+                raise ImportError(
+                    "Japanese text processing requires the 'preprocessing' module "
+                    "and its dependencies (pyopenjtalk). "
+                    "Ensure preprocessing.py is on your Python path."
+                ) from e
+            _FRONTENDS[language] = JAFrontend()
+        elif language == "chinese":
+            try:
+                from .preprocessing import ZHFrontend  # noqa: PLC0415
+            except ImportError as e:
+                raise ImportError(
+                    "Chinese text processing requires the 'preprocessing' module "
+                    "and its dependencies (jieba, pypinyin). "
+                    "Ensure preprocessing.py is on your Python path."
+                ) from e
+            _FRONTENDS[language] = ZHFrontend()
+        else:
+            _FRONTENDS[language] = None
+    return _FRONTENDS[language]
+
+
+def _normalize_text(text: str, language: str) -> str:
+    """Normalize *text* for text-input (non-phoneme) models.
+
+    Applies smart-quote normalization, then language-specific processing:
+    a CJK frontend for Japanese/Chinese, or NFKC normalization otherwise.
+    """
+    text = text.translate(_QUOTE_MAP)
+    frontend = _get_text_frontend(language)
+    if frontend is not None:
+        text = frontend(text)
+    else:
+        text = unicodedata.normalize("NFKC", text)
+    return text
 
 
 class NeuTTS:
@@ -410,9 +470,12 @@ class NeuTTS:
         """Build a prompt for torch inference using the HuggingFace chat template.
 
         For phoneme-based models the texts are first converted to phonemes and
-        a simple hand-crafted template is used. For all text-input models the
-        tokenizer's own ``apply_chat_template`` is called, optionally prefixed by
-        a system message carrying the lang token when ``use_lang_token`` is set.
+        a simple hand-crafted template is used. For text-input models both
+        ``ref_text`` and ``input_text`` are first normalized via
+        :func:`_normalize_text` (smart-quote stripping, NFKC, or a CJK frontend
+        for Japanese/Chinese), then the tokenizer's own ``apply_chat_template``
+        is called, optionally prefixed by a system message carrying the lang
+        token when ``use_lang_token`` is set.
 
         Args:
             ref_codes: Reference speech token indices.
@@ -432,6 +495,8 @@ class NeuTTS:
             prompt = f"""user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"""
 
         else:
+            ref_text = _normalize_text(ref_text, language or "")
+            input_text = _normalize_text(input_text, language or "")
             messages = []
             if self._use_lang_token:
                 lang_token = LANG_INFO[language]["token"]
