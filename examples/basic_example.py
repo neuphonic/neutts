@@ -4,7 +4,7 @@ from neutts import NeuTTS
 import torch
 
 
-def main(input_text, ref_audio_path, ref_text, backbone, output_path="output.wav"):
+def main(input_text, ref_audio_path, ref_text, backbone, language, output_path="output.wav"):
     if not ref_audio_path or not ref_text:
         print("No reference audio or text provided.")
         return None
@@ -15,6 +15,7 @@ def main(input_text, ref_audio_path, ref_text, backbone, output_path="output.wav
         backbone_device="cpu",
         codec_repo="neuphonic/neucodec",
         codec_device="cpu",
+        language=language
     )
 
     # Check if ref_text is a path if it is read it if not just return string
@@ -31,7 +32,7 @@ def main(input_text, ref_audio_path, ref_text, backbone, output_path="output.wav
         ref_codes = torch.load(ref_audio_path.replace(".wav", ".pt"))
 
     print(f"Generating audio for input text: {input_text}")
-    wav = tts.infer(input_text, ref_codes, ref_text)
+    wav = tts.infer(input_text, ref_codes, ref_text, language)
 
     print(f"Saving output to {output_path}")
     sf.write(output_path, wav, 24000)
@@ -58,6 +59,12 @@ if __name__ == "__main__":
         help="Reference text corresponding to the reference audio",
     )
     parser.add_argument(
+        "--language",
+        type=str,
+        default="english",
+        help="Generation language. One of: ['french', 'german', 'english', 'spanish', 'portuguese', 'japanese', 'korean', 'chinese', 'urdu'].",
+    )
+    parser.add_argument(
         "--output_path",
         type=str,
         default="output.wav",
@@ -75,5 +82,6 @@ if __name__ == "__main__":
         ref_audio_path=args.ref_audio,
         ref_text=args.ref_text,
         backbone=args.backbone,
+        language=args.language,
         output_path=args.output_path,
     )
