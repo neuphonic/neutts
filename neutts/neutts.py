@@ -26,6 +26,7 @@ BACKBONE_LANGUAGE_MAP = {
     "neuphonic/neutts-nano": "en-us",
     "neuphonic/neutts-nano-q4-gguf": "en-us",
     "neuphonic/neutts-nano-q8-gguf": "en-us",
+    "neuphonic/neutts-emotion-sft-multitag-24-05-26": "en-us",
     # de models
     "neuphonic/neutts-nano-german": "de",
     "neuphonic/neutts-nano-german-q4-gguf": "de",
