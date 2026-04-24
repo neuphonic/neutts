@@ -5,6 +5,7 @@ import unicodedata
 import warnings
 from pathlib import Path
 from typing import Generator
+from functools import lru_cache
 
 import numpy as np
 import torch
@@ -599,6 +600,7 @@ class NeuTTS:
         text: str,
         ref_codes: np.ndarray | torch.Tensor,
         ref_text: str,
+        emotion: str,
         language: str | None = None,
     ) -> np.ndarray:
         """Synthesise speech from text, conditioned on a reference voice.
@@ -619,9 +621,10 @@ class NeuTTS:
         self._validate_language(language)
 
         if self._is_quantized_model:
-            output_str = self._infer_ggml(ref_codes, ref_text, text, language=language)
+            #output_str = self._infer_ggml(ref_codes, ref_text, text, language=language)
+            raise ValueError("Won't work atm!")
         else:
-            output_str = self._infer_torch(ref_codes, ref_text, text, language=language)
+            output_str = self._infer_torch(ref_codes, ref_text, text, emotion, language=language)
 
         # Decode
         wav = self._decode(output_str)
@@ -667,6 +670,7 @@ class NeuTTS:
 
         raise NotImplementedError("Streaming is not implemented for the torch backend!")
 
+    @lru_cache(maxsize=4)
     @torch.no_grad()
     def encode(self, ref_audio_path: str | Path) -> torch.Tensor:
         """Encode a reference audio file into discrete speech token indices.
@@ -724,6 +728,7 @@ class NeuTTS:
         ref_codes: list[int],
         ref_text: str,
         text: str,
+        emotion: str,
         language: str | None = None,
     ) -> str:
         """Run a single forward pass through the torch backbone.
@@ -735,8 +740,18 @@ class NeuTTS:
             language: English language name. Required when ``use_lang_token`` is True.
         Returns:
             str: Raw model output containing generated speech tokens.
+
+        Text:   <|TEXT_PROMPT_START|><|NEUTRAL|>ref_text<|NEUTRAL_END|><|EMOTION|>gen_text<|EMOTION_END|><|TEXT_PROMPT_END|>
+        Speech: <|SPEECH_GENERATION_START|><|NEUTRAL|>ref_codes<|NEUTRAL_END|><|EMOTION|>gen_codes<|EMOTION_END|><|SPEECH_GENERATION_END|>
         """
-        prompt = self._apply_chat_template(ref_codes, ref_text, text, language=language)
+        # (harryjulian): just so we can test out the package with emotion tags
+        emotion_start = f"<|{emotion.upper()}|>"
+        emotion_end = f"<|{emotion.upper()}_END|>"
+        text_prompt = f"<|TEXT_PROMPT_START|><|NEUTRAL|>{ref_text}<|NEUTRAL_END|>{emotion_start}{text}{emotion_end}<|TEXT_PROMPT_END|>"
+        ref_codes_str = "".join([f"<|speech_{idx}|>" for idx in ref_codes])
+        speech_prompt = f"<|SPEECH_GENERATION_START|><|NEUTRAL|>{ref_codes_str}<|NEUTRAL_END|>{emotion_start}" 
+        prompt = text_prompt + speech_prompt
+
         prompt_ids = self.tokenizer.encode(prompt)
         prompt_tensor = torch.tensor(prompt_ids).unsqueeze(0).to(self.backbone.device)
         speech_end_id = self.tokenizer.convert_tokens_to_ids("<|SPEECH_GENERATION_END|>")

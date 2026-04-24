@@ -4,7 +4,7 @@ from neutts import NeuTTS
 import torch
 
 
-def main(input_text, ref_audio_path, ref_text, backbone, language, output_path="output.wav"):
+def main(input_text, ref_audio_path, ref_text, backbone, language, emotion, output_path="output.wav"):
     if not ref_audio_path or not ref_text:
         print("No reference audio or text provided.")
         return None
@@ -32,7 +32,7 @@ def main(input_text, ref_audio_path, ref_text, backbone, language, output_path="
         ref_codes = torch.load(ref_audio_path.replace(".wav", ".pt"))
 
     print(f"Generating audio for input text: {input_text}")
-    wav = tts.infer(input_text, ref_codes, ref_text, language)
+    wav = tts.infer(input_text, ref_codes, ref_text, emotion, language)
 
     print(f"Saving output to {output_path}")
     sf.write(output_path, wav, 24000)
@@ -76,6 +76,12 @@ if __name__ == "__main__":
         default="neuphonic/neutts-nano",
         help="Huggingface repo containing the backbone checkpoint",
     )
+    parser.add_argument(
+        "--emotion",
+        type=str,
+        default="neutral",
+        help="emote",
+    )
     args = parser.parse_args()
     main(
         input_text=args.input_text,
@@ -83,5 +89,6 @@ if __name__ == "__main__":
         ref_text=args.ref_text,
         backbone=args.backbone,
         language=args.language,
+        emotion=args.emotion,
         output_path=args.output_path,
     )
