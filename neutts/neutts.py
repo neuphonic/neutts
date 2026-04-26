@@ -12,6 +12,37 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from .phonemizers import BasePhonemizer, CUSTOM_PHONEMIZERS
 
 
+def _normalize_device(device: str) -> str:
+    """
+    Resolve a device string to a canonical torch device name.
+
+    Accepted values:
+      "auto"   – picks CUDA > MPS (Apple Metal) > CPU
+      "gpu"    – legacy alias: picks CUDA > MPS > CPU
+      "metal"  – explicit Apple Metal alias, maps to "mps"
+      "mps"    – Apple Metal Performance Shaders
+      "cuda"   – NVIDIA CUDA
+      "cpu"    – CPU
+    """
+    device = device.lower().strip()
+    if device == "auto":
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+    if device == "metal":
+        return "mps"
+    if device == "gpu":
+        # Legacy GGUF alias — prefer CUDA, fall back to MPS then CPU
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+    return device
+
+
 BACKBONE_LANGUAGE_MAP = {
     # en models
     "neuphonic/neutts-air": "en-us",
@@ -92,6 +123,10 @@ class NeuTTS:
         self._is_quantized_model = False
         self._is_onnx_codec = False
 
+        # Resolved device strings (canonical torch names)
+        self._backbone_device = _normalize_device(backbone_device)
+        self._codec_device = _normalize_device(codec_device)
+
         # HF tokenizer
         self.tokenizer = None
 
@@ -99,9 +134,9 @@ class NeuTTS:
         print("Loading phonemizer...")
         self._load_phonemizer(language, backbone_repo)
 
-        self._load_backbone(backbone_repo, backbone_device)
+        self._load_backbone(backbone_repo, self._backbone_device)
 
-        self._load_codec(codec_repo, codec_device)
+        self._load_codec(codec_repo, self._codec_device)
 
         # Load watermarker (optional)
         try:
@@ -142,20 +177,27 @@ class NeuTTS:
                 raise ImportError(
                     "Failed to import `llama_cpp`. "
                     "Please install it with:\n"
-                    "    pip install llama-cpp-python"
+                    "    pip install llama-cpp-python\n"
+                    "For Apple Metal (macOS), compile with:\n"
+                    "    CMAKE_ARGS='-DGGML_METAL=ON' pip install llama-cpp-python"
                 ) from e
 
             seed = random.randint(0, 2**32)
             print(f"Using seed {seed}")
 
+            # Metal (MPS) and CUDA both offload all layers to the GPU.
+            # Flash attention is CUDA-only — it must NOT be enabled on Metal.
+            use_gpu_layers = backbone_device in ("cuda", "mps")
+            use_flash_attn = backbone_device == "cuda"
+
             if os.path.isfile(backbone_repo):
                 self.backbone = Llama(
                     model_path=backbone_repo,
                     verbose=False,
-                    n_gpu_layers=-1 if backbone_device == "gpu" else 0,
+                    n_gpu_layers=-1 if use_gpu_layers else 0,
                     n_ctx=self.max_context,
                     mlock=True,
-                    flash_attn=True if backbone_device == "gpu" else False,
+                    flash_attn=use_flash_attn,
                     seed=seed,
                 )
             else:
@@ -163,20 +205,27 @@ class NeuTTS:
                     repo_id=backbone_repo,
                     filename="*.gguf",
                     verbose=False,
-                    n_gpu_layers=-1 if backbone_device == "gpu" else 0,
+                    n_gpu_layers=-1 if use_gpu_layers else 0,
                     n_ctx=self.max_context,
                     mlock=True,
-                    flash_attn=True if backbone_device == "gpu" else False,
+                    flash_attn=use_flash_attn,
                     seed=seed,
                 )
 
             self._is_quantized_model = True
 
         else:
+            # Use float16 on GPU backends for lower memory and faster inference.
+            # MPS (Apple Metal) supports float16; bfloat16 is not reliably supported.
+            if backbone_device in ("cuda", "mps"):
+                dtype = torch.float16
+            else:
+                dtype = torch.float32
+
             self.tokenizer = AutoTokenizer.from_pretrained(backbone_repo)
-            self.backbone = AutoModelForCausalLM.from_pretrained(backbone_repo).to(
-                torch.device(backbone_device)
-            )
+            self.backbone = AutoModelForCausalLM.from_pretrained(
+                backbone_repo, torch_dtype=dtype
+            ).to(torch.device(backbone_device))
 
     def _load_codec(self, codec_repo, codec_device):
 
@@ -203,8 +252,11 @@ class NeuTTS:
                 self.codec.eval().to(codec_device)
             case "neuphonic/neucodec-onnx-decoder" | "neuphonic/neucodec-onnx-decoder-int8":
 
-                if codec_device != "cpu":
-                    raise ValueError("Onnx decoder only currently runs on CPU.")
+                if codec_device not in ("cpu", "mps"):
+                    raise ValueError(
+                        "The ONNX decoder supports 'cpu' and 'mps' (Apple Metal) only. "
+                        "For NVIDIA GPU inference use the standard neucodec codec with codec_device='cuda'."
+                    )
 
                 try:
                     from neucodec import NeuCodecOnnxDecoder
@@ -216,6 +268,20 @@ class NeuTTS:
 
                 self.codec = NeuCodecOnnxDecoder.from_pretrained(codec_repo)
                 self._is_onnx_codec = True
+
+                if codec_device == "mps":
+                    try:
+                        import onnxruntime as ort
+                        available = ort.get_available_providers()
+                        if "CoreMLExecutionProvider" in available:
+                            warnings.warn(
+                                "CoreML execution provider is available. "
+                                "Re-instantiate the ONNX session manually with "
+                                "providers=['CoreMLExecutionProvider', 'CPUExecutionProvider'] "
+                                "for Neural Engine acceleration."
+                            )
+                    except ImportError:
+                        pass
 
             case _:
                 raise ValueError(
@@ -277,6 +343,8 @@ class NeuTTS:
     def encode_reference(self, ref_audio_path: str | Path):
         wav, _ = librosa.load(ref_audio_path, sr=16000, mono=True)
         wav_tensor = torch.from_numpy(wav).float().unsqueeze(0).unsqueeze(0)  # [1, 1, T]
+        if not self._is_onnx_codec:
+            wav_tensor = wav_tensor.to(self.codec.device)
         with torch.no_grad():
             ref_codes = self.codec.encode_code(audio_or_path=wav_tensor).squeeze(0).squeeze(0)
         return ref_codes
