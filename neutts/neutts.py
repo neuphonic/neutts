@@ -1,3 +1,4 @@
+import json
 import os
 import random
 from typing import Generator
@@ -181,6 +182,12 @@ class NeuTTS:
     def _load_codec(self, codec_repo, codec_device):
 
         print(f"Loading codec from: {codec_repo} on {codec_device} ...")
+        valid_codec_repos = (
+            "neuphonic/neucodec",
+            "neuphonic/distill-neucodec",
+            "neuphonic/neucodec-onnx-decoder",
+            "neuphonic/neucodec-onnx-decoder-int8",
+        )
 
         if codec_repo.endswith(".onnx") and os.path.isfile(codec_repo):
             try:
@@ -193,6 +200,49 @@ class NeuTTS:
 
             self.codec = NeuCodecOnnxDecoder(codec_repo)
             self._is_onnx_codec = True
+            return
+
+        if os.path.isdir(codec_repo):
+            config_path = os.path.join(codec_repo, "config.json")
+            codec_repo_name = os.path.basename(os.path.normpath(codec_repo)).lower()
+
+            if os.path.isfile(os.path.join(codec_repo, "decoder.onnx")):
+                if codec_device != "cpu":
+                    raise ValueError("Onnx decoder only currently runs on CPU.")
+
+                try:
+                    from neucodec import NeuCodecOnnxDecoder
+                except ImportError as e:
+                    raise ImportError(
+                        "Failed to import the onnx decoder."
+                        " Ensure you have onnxruntime installed as well as neucodec >= 0.0.4."
+                    ) from e
+
+                self.codec = NeuCodecOnnxDecoder.from_pretrained(codec_repo)
+                self._is_onnx_codec = True
+                return
+
+            architectures = []
+            if os.path.isfile(config_path):
+                with open(config_path, "r") as f:
+                    config = json.load(f)
+                architectures = [
+                    architecture.lower()
+                    for architecture in config.get("architectures", [])
+                    if isinstance(architecture, str)
+                ]
+
+            codec_hints = [codec_repo_name, *architectures]
+
+            if any("distillneucodec" in hint or "distill-neucodec" in hint for hint in codec_hints):
+                self.codec = DistillNeuCodec.from_pretrained(codec_repo)
+                self.codec.eval().to(codec_device)
+                return
+
+            if any("neucodec" in hint for hint in codec_hints):
+                self.codec = NeuCodec.from_pretrained(codec_repo)
+                self.codec.eval().to(codec_device)
+                return
 
         match codec_repo:
             case "neuphonic/neucodec":
@@ -219,9 +269,8 @@ class NeuTTS:
 
             case _:
                 raise ValueError(
-                    "Invalid codec repo! Must be one of:"
-                    " 'neuphonic/neucodec', 'neuphonic/distill-neucodec',"
-                    " 'neuphonic/neucodec-onnx-decoder'."
+                    "Invalid codec repo! Must be one of: "
+                    f"{', '.join(valid_codec_repos)}, or a local file/directory path."
                 )
 
     def infer(self, text: str, ref_codes: np.ndarray | torch.Tensor, ref_text: str) -> np.ndarray:
