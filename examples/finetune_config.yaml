@@ -2,6 +2,12 @@
 restore_from: "neuphonic/neutts-air"
 save_root: "/data"
 run_name: "neutts-finetune"
+language: "en-us"
+
+# dataset info
+dataset_name: "neuphonic/emilia-yodas-english-neucodec"
+dataset_split: "train[:2000]"
+dataset_from_disk: false
 
 # model info
 codebook_size: 65536 # xcodec
