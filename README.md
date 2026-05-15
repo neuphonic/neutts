@@ -189,6 +189,19 @@ wav = tts.infer(input_text, ref_codes, ref_text)
 sf.write("test.wav", wav, 24000)
 ```
 
+### Offline Usage
+
+To run from models that are already on disk, pass local Hugging Face snapshot paths for both `backbone_repo` and `codec_repo`. Codec paths can point to a `neuphonic/neucodec` or `neuphonic/distill-neucodec` snapshot, a `neuphonic/neucodec-onnx-decoder` snapshot containing `decoder.onnx`, or directly to a local `.onnx` decoder file.
+
+```python
+tts = NeuTTS(
+   backbone_repo="/path/to/neutts-nano",
+   backbone_device="cpu",
+   codec_repo="/path/to/neucodec",
+   codec_device="cpu"
+)
+```
+
 ### Streaming
 
 Speech can also be synthesised in _streaming mode_, where audio is generated in chunks and plays as generated. Note that this requires pyaudio to be installed. To do this, run:

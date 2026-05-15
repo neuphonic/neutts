@@ -1,7 +1,10 @@
 import os
+from importlib import import_module
+
 import torch
 import numpy as np
 import pytest
+
 from neutts import NeuTTS, BACKBONE_LANGUAGE_MAP
 
 
@@ -19,6 +22,44 @@ CODECS = [
     "neuphonic/distill-neucodec",
     "neuphonic/neucodec-onnx-decoder",
 ]
+
+
+class _DummyCodec:
+    loaded_from = None
+
+    @classmethod
+    def from_pretrained(cls, codec_repo):
+        cls.loaded_from = codec_repo
+        return cls()
+
+    def eval(self):
+        self.evaluated = True
+        return self
+
+    def to(self, device):
+        self.device = device
+        return self
+
+
+class _DummyNeuCodec(_DummyCodec):
+    pass
+
+
+class _DummyDistillNeuCodec(_DummyCodec):
+    pass
+
+
+class _DummyOnnxDecoder:
+    loaded_from = None
+    loaded_file = None
+
+    def __init__(self, codec_repo):
+        type(self).loaded_file = codec_repo
+
+    @classmethod
+    def from_pretrained(cls, codec_repo):
+        cls.loaded_from = codec_repo
+        return cls(codec_repo)
 
 
 @pytest.fixture()
@@ -77,6 +118,69 @@ def _run_streaming_test(backbone, codec, reference_data):
         chunks.append(chunk)
 
     assert len(chunks) > 0, "Stream yielded no audio chunks"
+
+
+@pytest.mark.parametrize(
+    "architecture,dummy_codec",
+    [
+        ("NeuCodec", _DummyNeuCodec),
+        ("DistillNeuCodec", _DummyDistillNeuCodec),
+    ],
+)
+def test_load_codec_supports_local_model_directories(
+    tmp_path, monkeypatch, architecture, dummy_codec
+):
+    neutts_module = import_module("neutts.neutts")
+    monkeypatch.setattr(neutts_module, "NeuCodec", _DummyNeuCodec)
+    monkeypatch.setattr(neutts_module, "DistillNeuCodec", _DummyDistillNeuCodec)
+    _DummyNeuCodec.loaded_from = None
+    _DummyDistillNeuCodec.loaded_from = None
+
+    codec_dir = tmp_path / "snapshot"
+    codec_dir.mkdir()
+    (codec_dir / "config.json").write_text(f'{{"architectures": ["{architecture}"]}}')
+
+    model = NeuTTS.__new__(NeuTTS)
+    model._is_onnx_codec = False
+    model._load_codec(str(codec_dir), "cpu")
+
+    assert dummy_codec.loaded_from == str(codec_dir)
+    assert model.codec.evaluated is True
+    assert model.codec.device == "cpu"
+    assert model._is_onnx_codec is False
+
+
+def test_load_codec_supports_local_onnx_file_without_fallthrough(tmp_path, monkeypatch):
+    neucodec = import_module("neucodec")
+    monkeypatch.setattr(neucodec, "NeuCodecOnnxDecoder", _DummyOnnxDecoder, raising=False)
+    _DummyOnnxDecoder.loaded_file = None
+
+    codec_file = tmp_path / "decoder.onnx"
+    codec_file.write_bytes(b"")
+
+    model = NeuTTS.__new__(NeuTTS)
+    model._is_onnx_codec = False
+    model._load_codec(str(codec_file), "cpu")
+
+    assert _DummyOnnxDecoder.loaded_file == str(codec_file)
+    assert model._is_onnx_codec is True
+
+
+def test_load_codec_supports_local_onnx_directories(tmp_path, monkeypatch):
+    neucodec = import_module("neucodec")
+    monkeypatch.setattr(neucodec, "NeuCodecOnnxDecoder", _DummyOnnxDecoder, raising=False)
+    _DummyOnnxDecoder.loaded_from = None
+
+    codec_dir = tmp_path / "neucodec-onnx-decoder"
+    codec_dir.mkdir()
+    (codec_dir / "decoder.onnx").write_bytes(b"")
+
+    model = NeuTTS.__new__(NeuTTS)
+    model._is_onnx_codec = False
+    model._load_codec(str(codec_dir), "cpu")
+
+    assert _DummyOnnxDecoder.loaded_from == str(codec_dir)
+    assert model._is_onnx_codec is True
 
 
 @pytest.mark.parametrize("backbone", _QUICK_BACKBONES)
