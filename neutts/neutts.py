@@ -573,30 +573,13 @@ class NeuTTS:
             prompt = f"""user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"""
             return self.tokenizer.encode(prompt)
 
-        # --- text-input path ---
+        # --- text-input path (sentinel-splice for both neutral and emotion) ---
         ref_text = _normalize_text(ref_text, language or "")
         input_text = _normalize_text(input_text, language or "")
 
-        if emotion is None:
-            messages = []
-            if self._use_lang_token:
-                lang_token = LANG_INFO[language]["token"]
-                messages.append({"role": "system", "content": lang_token})
-            messages.append({"role": "user", "content": f"{ref_text} {input_text}"})
-            messages.append({"role": "assistant", "content": codes_str})
-            prompt = self.tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=False
-            )
-            return self.tokenizer.encode(prompt)
-
-        # --- text-input + emotion: sentinel-splice ---
-        emotion_token_str = f"<|{emotion.upper()}|>"
-        emotion_id = self.tokenizer.convert_tokens_to_ids(emotion_token_str)
-        if emotion_id == self.tokenizer.unk_token_id:
-            raise ValueError(
-                f"Emotion token '{emotion_token_str}' is not in the model's vocabulary. "
-                "Check the emotion label or the loaded checkpoint."
-            )
+        # "neutral" means no emotion token — same as omitting emotion entirely
+        if emotion == "neutral":
+            emotion = None
 
         text_prompt_start = self.tokenizer.convert_tokens_to_ids("<|TEXT_PROMPT_START|>")
         text_prompt_end = self.tokenizer.convert_tokens_to_ids("<|TEXT_PROMPT_END|>")
@@ -608,21 +591,32 @@ class NeuTTS:
         ids = self.tokenizer.encode(
             f"{lang_prefix}<|TEXT_REPLACE|><|SPEECH_REPLACE|>", add_special_tokens=True
         )
-
-        ref_ids = self.tokenizer.encode(ref_text, add_special_tokens=False)
-        gen_ids = self.tokenizer.encode(input_text, add_special_tokens=False)
         ref_code_tokens = self.tokenizer.encode(codes_str, add_special_tokens=False)
 
+        if emotion is None:
+            # single-encode the concatenation so BPE resolves the boundary cleanly
+            combined_ids = self.tokenizer.encode(f"{ref_text} {input_text}", add_special_tokens=False)
+            text_section = [text_prompt_start] + combined_ids + [text_prompt_end]
+        else:
+            emotion_token_str = f"<|{emotion.upper()}|>"
+            emotion_id = self.tokenizer.convert_tokens_to_ids(emotion_token_str)
+            if emotion_id == self.tokenizer.unk_token_id:
+                raise ValueError(
+                    f"Emotion token '{emotion_token_str}' is not in the model's vocabulary. "
+                    "Check the emotion label or the loaded checkpoint."
+                )
+            ref_ids = self.tokenizer.encode(ref_text, add_special_tokens=False)
+            gen_ids = self.tokenizer.encode(input_text, add_special_tokens=False)
+            text_section = (
+                [text_prompt_start]
+                + ref_ids
+                + [emotion_id]
+                + gen_ids
+                + [text_prompt_end]
+            )
+
         text_replace_idx = ids.index(text_replace)
-        ids = (
-            ids[:text_replace_idx]
-            + [text_prompt_start]
-            + ref_ids
-            + [emotion_id]
-            + gen_ids
-            + [text_prompt_end]
-            + ids[text_replace_idx + 1:]
-        )
+        ids = ids[:text_replace_idx] + text_section + ids[text_replace_idx + 1:]
 
         speech_replace_idx = ids.index(speech_replace)
         ids = ids[:speech_replace_idx] + [speech_gen_start] + ref_code_tokens
