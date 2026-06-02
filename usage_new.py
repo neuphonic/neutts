@@ -233,9 +233,9 @@ _default_langs = list(DEFAULT_SPEAKERS[_default_model].keys())
 _default_is_multi = len(_default_langs) > 1
 _, _, _default_gen_text, _default_ref_text, _default_ref_audio = _speaker_ref_outputs(_default_lang, _default_spk)
 
-with gr.Blocks(title="NeuTTS-Nano Multilingual Collection - COMPARISON 🌍") as demo:
-    gr.Markdown("## NeuTTS-Nano Multilingual Collection - COMPARISON 🌍")
-    gr.Markdown("Select a language and a reference speaker to automatically load example audio and text. Select 'Custom' to provide your own references!")
+with gr.Blocks(title="NeuTTS-Nano-Emotion - COMPARISON 😂😭😲😍") as demo:
+    gr.Markdown("## NeuTTS-Nano-Emotion - COMPARISON 😂😭😲😍")
+    gr.Markdown("Select a model, an emotion, and a reference speaker. Use 'Custom' to provide your own reference audio and text.")
 
     with gr.Row():
         lang_dropdown = gr.Dropdown(
