@@ -717,6 +717,7 @@ class NeuTTS:
         emotion: str | None = None,
         temperature: float = 1.0,
         top_k: int = 50,
+        verbose: bool = False,
     ) -> np.ndarray:
         """Synthesise speech from text, conditioned on a reference voice.
 
@@ -757,7 +758,7 @@ class NeuTTS:
         else:
             output_str = self._infer_torch(
                 ref_codes, ref_text, text, language=language, emotion=emotion,
-                temperature=temperature, top_k=top_k,
+                temperature=temperature, top_k=top_k, verbose=verbose,
             )
 
         # Decode
@@ -858,6 +859,7 @@ class NeuTTS:
         emotion: str | None = None,
         temperature: float = 1.0,
         top_k: int = 50,
+        verbose: bool = False,
     ) -> str:
         """Run a single forward pass through the torch backbone.
 
@@ -875,6 +877,8 @@ class NeuTTS:
         prompt_ids = self._apply_chat_template(
             ref_codes, ref_text, text, language=language, emotion=emotion
         )
+        if verbose:
+            print(self.tokenizer.decode(prompt_ids))
         prompt_tensor = torch.tensor(prompt_ids).unsqueeze(0).to(self.backbone.device)
         speech_end_id = self.tokenizer.convert_tokens_to_ids("<|SPEECH_GENERATION_END|>")
         with torch.no_grad():
