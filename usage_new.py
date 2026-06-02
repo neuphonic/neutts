@@ -98,97 +98,30 @@ GEN_TEXTS = {
     "portuguese": "Meu nome é Diogo. Tenho vinte e cinco anos e acabei de me mudar para Londres. O metrô é um pouco confuso, mas me leva a qualquer lugar num instante.",
 }
 
+EMOTIONS = ["neutral", "angry", "sad", "happy", "surprised", "disgusted", "fearful"]
+
+# Per-model feature flags.
+MODEL_META = {
+    "qwen3-0.2b-en-cfg-distilled-emotional-sft-10k-26-03-26": {"supports_emotions": True},
+    "qwen3-0.2b-en-emotional-grpo-1625-08-04-26":             {"supports_emotions": True},
+}
+
 # Default speaker per model per language. Single-language models have one entry.
 # Multilingual models list all supported languages — these drive the synthesis language dropdown.
 DEFAULT_SPEAKERS = {
-    # "qwen3-0.6b-bpe": {"english": "jo"},
-    "English (double GRPO)": {"english": "paul"},
-    # "English (single GRPO)": {"english": "paul"},
-    # "Spanish": {"spanish": "martina"},
-    # "German": {"german": "carla"},
-    # "French": {"french": "amelie"},
-    # "Urdu": {"urdu": "jess"},
-    "qwen3-0.2b-9langs-grpo": {
-        "english": "paul",
-        "spanish": "martina",
-        "german": "carla",
-        "french": "amelie",
-        "urdu": "jess",
-        "japanese": "miwa",
-        "korean": "siwoo",
-        "chinese": "mei",
-        "portuguese": "diogo",
-    },
-    "qwen3-0.2b-9langs-grpo-bugfix": {
-        "english": "paul",
-        "spanish": "martina",
-        "german": "carla",
-        "french": "amelie",
-        "urdu": "jess",
-        "japanese": "miwa",
-        "korean": "siwoo",
-        "chinese": "mei",
-        "portuguese": "diogo",
-    },
+    "qwen3-0.2b-en-cfg-distilled-emotional-sft-10k-26-03-26": {"english": "paul"},
+    "qwen3-0.2b-en-emotional-grpo-1625-08-04-26":             {"english": "paul"},
 }
 
 tts_dict = {
-    # TODO fix config and add back
-    # "qwen3-0.6b-bpe": NeuTTSAir(
-    #     backbone_repo="neuphonic/qwen3-0.6b-en-cfg-distilled-60k-23-03-26",
-    #     backbone_device="cuda",
-    #     codec_repo="neuphonic/neucodec",
-    #     codec_device="cuda",
-    #     language="en-us",
-    # ),
-    "English (double GRPO)": NeuTTSAir(
-        backbone_repo="neuphonic/neutts-nano-punc-aligned",
-        backbone_device="cuda",
-        codec_repo="neuphonic/neucodec",
-        codec_device="cuda",
-        language="en-us",
-    ),
-    # "English (single GRPO)": NeuTTSAir(
-    #     backbone_repo="neuphonic/neutts-nano-punc-aligned-single-grpo",
-    #     backbone_device="cuda",
-    #     codec_repo="neuphonic/neucodec",
-    #     codec_device="cuda",
-    #     language="en-us",
-    # ),
-    # "Spanish": NeuTTSAir(
-    #     backbone_repo="neuphonic/neutts-nano-spanish",
-    #     backbone_device="cuda",
-    #     codec_repo="neuphonic/neucodec",
-    #     codec_device="cuda",
-    # ),
-    # "German": NeuTTSAir(
-    #     backbone_repo="neuphonic/nano_finetune_de_grpo_500_27_02_2026",
-    #     backbone_device="cuda",
-    #     codec_repo="neuphonic/neucodec",
-    #     codec_device="cuda",
-    #     language="de",
-    # ),
-    # "French": NeuTTSAir(
-    #     backbone_repo="neuphonic/neutts-nano-french",
-    #     backbone_device="cuda",
-    #     codec_repo="neuphonic/neucodec",
-    #     codec_device="cuda",
-    # ),
-    # "Urdu": NeuTTSAir(
-    #     backbone_repo="neuphonic/nano_finetune_ur_95k_09_03_2026",
-    #     backbone_device="cuda",
-    #     codec_repo="neuphonic/neucodec",
-    #     codec_device="cuda",
-    #     language="ur",
-    # ),
-    "qwen3-0.2b-9langs-grpo": NeuTTSAir(
-        backbone_repo="neuphonic/qwen3-0.2b-9langs-grpo-1750-14-04-26",
+    "qwen3-0.2b-en-cfg-distilled-emotional-sft-10k-26-03-26": NeuTTSAir(
+        backbone_repo="neuphonic/qwen3-0.2b-en-cfg-distilled-emotional-sft-10k-26-03-26",
         backbone_device="cuda",
         codec_repo="neuphonic/neucodec",
         codec_device="cuda",
     ),
-    "qwen3-0.2b-9langs-grpo-bugfix": NeuTTSAir(
-        backbone_repo="neuphonic/qwen3-0.2b-9langs-grpo-bugfix-1000-19-05-26",
+    "qwen3-0.2b-en-emotional-grpo-1625-08-04-26": NeuTTSAir(
+        backbone_repo="neuphonic/qwen3-0.2b-en-emotional-grpo-1625-08-04-26",
         backbone_device="cuda",
         codec_repo="neuphonic/neucodec",
         codec_device="cuda",
@@ -209,6 +142,7 @@ def infer(
     synthesis_lang: str,
     temperature: float,
     top_k: int,
+    emotion: str,
 ) -> tuple[int, np.ndarray]:
 
     if not ref_audio_path or not ref_text.strip():
@@ -233,20 +167,17 @@ def infer(
         print(f"Reference phones: {current_tts._to_phones(ref_text)}")
         print(f"Phones to generate: {current_tts._to_phones(gen_text)}")
 
+    supports_emotions = MODEL_META[model]["supports_emotions"]
     is_multilingual = len(DEFAULT_SPEAKERS[model]) > 1
-    if is_multilingual:
-        wav = current_tts.infer(
-            gen_text,
-            ref_codes,
-            ref_text,
-            language=synthesis_lang,
-            temperature=float(temperature),
-            top_k=top_k,
-        )
-    else:
-        wav = current_tts.infer(
-            gen_text, ref_codes, ref_text, temperature=float(temperature), top_k=top_k
-        )
+    wav = current_tts.infer(
+        gen_text,
+        ref_codes,
+        ref_text,
+        language=synthesis_lang if is_multilingual else None,
+        temperature=float(temperature),
+        top_k=top_k,
+        emotion=emotion if supports_emotions else None,
+    )
 
     return (24_000, wav)
 
@@ -266,12 +197,14 @@ def update_language(model):
     first_lang = langs[0]
     default_spk = DEFAULT_SPEAKERS[model][first_lang]
     spk_choices, spk_value, gen_text, ref_text, ref_audio = _speaker_ref_outputs(first_lang, default_spk)
+    supports_emotions = MODEL_META[model]["supports_emotions"]
     return (
         gr.update(choices=spk_choices, value=spk_value),
         gen_text,
         ref_text,
         ref_audio,
         gr.update(choices=langs, value=first_lang, visible=is_multi),
+        gr.update(visible=supports_emotions),
     )
 
 
@@ -293,7 +226,7 @@ def update_speaker(synthesis_lang, speaker):
     return gr.update(value=ref_data["ref_text"]), gr.update(value=ref_data["ref_audio"])
 
 
-_default_model = "qwen3-0.2b-9langs-grpo-bugfix"
+_default_model = "qwen3-0.2b-en-emotional-grpo-1625-08-04-26"
 _default_lang = "english"
 _default_spk = DEFAULT_SPEAKERS[_default_model][_default_lang]
 _default_langs = list(DEFAULT_SPEAKERS[_default_model].keys())
@@ -307,18 +240,11 @@ with gr.Blocks(title="NeuTTS-Nano Multilingual Collection - COMPARISON 🌍") as
     with gr.Row():
         lang_dropdown = gr.Dropdown(
             choices=[
-                # "qwen3-0.6b-bpe",
-                # "English (single GRPO)",
-                "English (double GRPO)",
-                # "Spanish",
-                # "German",
-                # "French",
-                # "Urdu",
-                "qwen3-0.2b-9langs-grpo",
-                "qwen3-0.2b-9langs-grpo-bugfix",
+                "qwen3-0.2b-en-cfg-distilled-emotional-sft-10k-26-03-26",
+                "qwen3-0.2b-en-emotional-grpo-1625-08-04-26",
             ],
             value=_default_model,
-            label="Language / Model",
+            label="Model",
         )
         synthesis_lang_dropdown = gr.Dropdown(
             choices=_default_langs,
@@ -330,6 +256,12 @@ with gr.Blocks(title="NeuTTS-Nano Multilingual Collection - COMPARISON 🌍") as
             choices=list(SPEAKERS.get(_default_lang, {}).keys()) + ["Custom"],
             value=_default_spk,
             label="Speaker Name",
+        )
+        emotion_dropdown = gr.Dropdown(
+            choices=EMOTIONS,
+            value="neutral",
+            visible=MODEL_META[_default_model]["supports_emotions"],
+            label="Emotion",
         )
 
     with gr.Row():
@@ -378,6 +310,7 @@ with gr.Blocks(title="NeuTTS-Nano Multilingual Collection - COMPARISON 🌍") as
             ref_text_input,
             ref_audio_input,
             synthesis_lang_dropdown,
+            emotion_dropdown,
         ],
     )
 
@@ -403,6 +336,7 @@ with gr.Blocks(title="NeuTTS-Nano Multilingual Collection - COMPARISON 🌍") as
             synthesis_lang_dropdown,
             temperature_slider,
             top_k_slider,
+            emotion_dropdown,
         ],
         outputs=[output_audio],
     )
