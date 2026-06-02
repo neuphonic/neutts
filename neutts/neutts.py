@@ -721,6 +721,8 @@ class NeuTTS:
         ref_text: str,
         language: str | None = None,
         emotion: str | None = None,
+        temperature: float = 1.0,
+        top_k: int = 50,
     ) -> np.ndarray:
         """Synthesise speech from text, conditioned on a reference voice.
 
@@ -734,6 +736,8 @@ class NeuTTS:
             emotion: Emotion label (e.g. ``"happy"``, ``"sad"``). Only supported
                      for text-input torch backbone models. The label is resolved to
                      a ``<|EMOTION|>`` special token in the model vocabulary.
+            temperature: Sampling temperature (torch backbone only).
+            top_k: Top-K sampling cutoff (torch backbone only).
         Returns:
             np.ndarray: 1-D float32 waveform at ``self.sample_rate`` Hz.
         Raises:
@@ -757,7 +761,10 @@ class NeuTTS:
         if self._is_quantized_model:
             output_str = self._infer_ggml(ref_codes, ref_text, text, language=language)
         else:
-            output_str = self._infer_torch(ref_codes, ref_text, text, language=language, emotion=emotion)
+            output_str = self._infer_torch(
+                ref_codes, ref_text, text, language=language, emotion=emotion,
+                temperature=temperature, top_k=top_k,
+            )
 
         # Decode
         wav = self._decode(output_str)
@@ -855,6 +862,8 @@ class NeuTTS:
         text: str,
         language: str | None = None,
         emotion: str | None = None,
+        temperature: float = 1.0,
+        top_k: int = 50,
     ) -> str:
         """Run a single forward pass through the torch backbone.
 
@@ -864,6 +873,8 @@ class NeuTTS:
             text: Input text to synthesise.
             language: English language name. Required when ``use_lang_token`` is True.
             emotion: Emotion label (e.g. ``"happy"``). Only for text-input models.
+            temperature: Sampling temperature.
+            top_k: Top-K sampling cutoff.
         Returns:
             str: Raw model output containing generated speech tokens.
         """
@@ -878,8 +889,8 @@ class NeuTTS:
                 max_length=self.max_context,
                 eos_token_id=speech_end_id,
                 do_sample=True,
-                temperature=1.0,
-                top_k=50,
+                temperature=temperature,
+                top_k=top_k,
                 use_cache=True,
                 min_new_tokens=50,
             )
