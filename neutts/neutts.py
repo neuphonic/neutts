@@ -535,16 +535,20 @@ class NeuTTS:
         ref_text: str,
         input_text: str,
         language: str | None = None,
-    ) -> str:
-        """Build a prompt for torch inference using the HuggingFace chat template.
+        emotion: str | None = None,
+    ) -> list[int]:
+        """Build a prompt for torch inference and return it as token IDs.
 
-        For phoneme-based models the texts are first converted to phonemes and
-        a simple hand-crafted template is used. For text-input models both
-        ``ref_text`` and ``input_text`` are first normalized via
-        :func:`_normalize_text` (smart-quote stripping, NFKC, or a CJK frontend
-        for Japanese/Chinese), then the tokenizer's own ``apply_chat_template``
-        is called, optionally prefixed by a system message carrying the lang
-        token when ``use_lang_token`` is set.
+        Three branches:
+
+        * **phoneme-input**: texts are converted to phonemes, a hand-crafted
+          template string is built and encoded.
+        * **text-input, no emotion**: texts are normalised, the tokenizer's
+          ``apply_chat_template`` is called, and the result is encoded.
+        * **text-input + emotion**: texts are normalised then token IDs are
+          assembled via sentinel-splice so that the emotion token is inserted
+          between the reference and generation token sequences at the ID level
+          (matching the format used in ``infer_bpe_emotions_concat.py``).
 
         Args:
             ref_codes: Reference speech token indices.
@@ -552,20 +556,28 @@ class NeuTTS:
             input_text: Text to synthesise.
             language: English language name (e.g. ``"french"``). Required when
                       ``use_lang_token`` is True.
+            emotion: Emotion label (e.g. ``"happy"``, ``"sad"``). Resolved to
+                     the ``<|EMOTION|>`` special token. Only valid for text-input
+                     models; raises ``ValueError`` if the token is not in vocab.
         Returns:
-            str: Formatted prompt string (not tokenised).
+            list[int]: Token IDs ready to be fed to the torch backbone.
+        Raises:
+            ValueError: If ``emotion`` is supplied but its special token is not
+                        in the model's vocabulary.
         """
         codes_str = "".join([f"<|speech_{i}|>" for i in ref_codes])
 
         if self.input_format == "phonemes":
-            # use old template
             ref_text = self._to_phones(ref_text)
             input_text = self._to_phones(input_text)
             prompt = f"""user: Convert the text to speech:<|TEXT_PROMPT_START|>{ref_text} {input_text}<|TEXT_PROMPT_END|>\nassistant:<|SPEECH_GENERATION_START|>{codes_str}"""
+            return self.tokenizer.encode(prompt)
 
-        else:
-            ref_text = _normalize_text(ref_text, language or "")
-            input_text = _normalize_text(input_text, language or "")
+        # --- text-input path ---
+        ref_text = _normalize_text(ref_text, language or "")
+        input_text = _normalize_text(input_text, language or "")
+
+        if emotion is None:
             messages = []
             if self._use_lang_token:
                 lang_token = LANG_INFO[language]["token"]
@@ -575,8 +587,47 @@ class NeuTTS:
             prompt = self.tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=False
             )
+            return self.tokenizer.encode(prompt)
 
-        return prompt
+        # --- text-input + emotion: sentinel-splice ---
+        emotion_token_str = f"<|{emotion.upper()}|>"
+        emotion_id = self.tokenizer.convert_tokens_to_ids(emotion_token_str)
+        if emotion_id == self.tokenizer.unk_token_id:
+            raise ValueError(
+                f"Emotion token '{emotion_token_str}' is not in the model's vocabulary. "
+                "Check the emotion label or the loaded checkpoint."
+            )
+
+        text_prompt_start = self.tokenizer.convert_tokens_to_ids("<|TEXT_PROMPT_START|>")
+        text_prompt_end = self.tokenizer.convert_tokens_to_ids("<|TEXT_PROMPT_END|>")
+        text_replace = self.tokenizer.convert_tokens_to_ids("<|TEXT_REPLACE|>")
+        speech_replace = self.tokenizer.convert_tokens_to_ids("<|SPEECH_REPLACE|>")
+        speech_gen_start = self.tokenizer.convert_tokens_to_ids("<|SPEECH_GENERATION_START|>")
+
+        lang_prefix = LANG_INFO[language]["token"] if (self._use_lang_token and language) else ""
+        ids = self.tokenizer.encode(
+            f"{lang_prefix}<|TEXT_REPLACE|><|SPEECH_REPLACE|>", add_special_tokens=True
+        )
+
+        ref_ids = self.tokenizer.encode(ref_text, add_special_tokens=False)
+        gen_ids = self.tokenizer.encode(input_text, add_special_tokens=False)
+        ref_code_tokens = self.tokenizer.encode(codes_str, add_special_tokens=False)
+
+        text_replace_idx = ids.index(text_replace)
+        ids = (
+            ids[:text_replace_idx]
+            + [text_prompt_start]
+            + ref_ids
+            + [emotion_id]
+            + gen_ids
+            + [text_prompt_end]
+            + ids[text_replace_idx + 1:]
+        )
+
+        speech_replace_idx = ids.index(speech_replace)
+        ids = ids[:speech_replace_idx] + [speech_gen_start] + ref_code_tokens
+
+        return ids
 
     def _validate_language(self, language: str | None) -> None:
         """Validate ``language`` against the model's language configuration.
@@ -669,6 +720,7 @@ class NeuTTS:
         ref_codes: np.ndarray | torch.Tensor,
         ref_text: str,
         language: str | None = None,
+        emotion: str | None = None,
     ) -> np.ndarray:
         """Synthesise speech from text, conditioned on a reference voice.
 
@@ -679,18 +731,33 @@ class NeuTTS:
             language: English language name (e.g. ``"french"``). Required when
                       ``use_lang_token`` is True; optional but validated for
                       other multilingual models; informational for monolingual models.
+            emotion: Emotion label (e.g. ``"happy"``, ``"sad"``). Only supported
+                     for text-input torch backbone models. The label is resolved to
+                     a ``<|EMOTION|>`` special token in the model vocabulary.
         Returns:
             np.ndarray: 1-D float32 waveform at ``self.sample_rate`` Hz.
         Raises:
-            ValueError: If ``language`` fails validation (see :meth:`_validate_language`),
-                        or if ``language`` is provided with a GGML backbone (not yet supported).
+            ValueError: If ``language`` fails validation, if ``emotion`` is used
+                        with a phoneme-input model, or if the emotion token is not
+                        in the model vocabulary.
+            NotImplementedError: If ``emotion`` is used with a GGUF backbone.
         """
+        if emotion is not None:
+            if self._is_quantized_model:
+                raise NotImplementedError(
+                    "Emotion inference is only supported for torch backends, not GGUF."
+                )
+            if self.input_format == "phonemes":
+                raise ValueError(
+                    "Emotion inference is not supported for phoneme-input models."
+                )
+
         self._validate_language(language)
 
         if self._is_quantized_model:
             output_str = self._infer_ggml(ref_codes, ref_text, text, language=language)
         else:
-            output_str = self._infer_torch(ref_codes, ref_text, text, language=language)
+            output_str = self._infer_torch(ref_codes, ref_text, text, language=language, emotion=emotion)
 
         # Decode
         wav = self._decode(output_str)
@@ -787,6 +854,7 @@ class NeuTTS:
         ref_text: str,
         text: str,
         language: str | None = None,
+        emotion: str | None = None,
     ) -> str:
         """Run a single forward pass through the torch backbone.
 
@@ -795,11 +863,13 @@ class NeuTTS:
             ref_text: Transcript of the reference audio.
             text: Input text to synthesise.
             language: English language name. Required when ``use_lang_token`` is True.
+            emotion: Emotion label (e.g. ``"happy"``). Only for text-input models.
         Returns:
             str: Raw model output containing generated speech tokens.
         """
-        prompt = self._apply_chat_template(ref_codes, ref_text, text, language=language)
-        prompt_ids = self.tokenizer.encode(prompt)
+        prompt_ids = self._apply_chat_template(
+            ref_codes, ref_text, text, language=language, emotion=emotion
+        )
         prompt_tensor = torch.tensor(prompt_ids).unsqueeze(0).to(self.backbone.device)
         speech_end_id = self.tokenizer.convert_tokens_to_ids("<|SPEECH_GENERATION_END|>")
         with torch.no_grad():
