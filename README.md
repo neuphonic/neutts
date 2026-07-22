@@ -215,7 +215,20 @@ sf.write("test.wav", wav, 24000)
 
 ### Streaming
 
-Speech can also be synthesised in _streaming mode_, where audio is generated in chunks and plays as generated. Note that this requires pyaudio to be installed. To do this, run:
+Speech can also be synthesised in _streaming mode_, where audio is generated in chunks and plays as generated. The streaming example scripts use `pyaudio` for playback, which needs the PortAudio library on macOS and Linux:
+
+```bash
+# macOS
+brew install portaudio && pip install pyaudio
+
+# Ubuntu/Debian
+sudo apt install portaudio19-dev && pip install pyaudio
+
+# Windows (prebuilt wheels)
+pip install pyaudio
+```
+
+Then run:
 
 ```bash
 python -m examples.basic_streaming_example \

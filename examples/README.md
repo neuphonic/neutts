@@ -44,7 +44,18 @@ Since the onnx codec is decoder-only, this requires the pre-encoded reference (e
 
 ### Streaming Support
 
-To stream the model output in chunks, try out the `basic_streaming_example.py` example. For streaming, only the GGUF backbones are currently supported. Ensure you have `llama-cpp-python`, `onnxruntime` and `pyaudio` installed to run this example.
+To stream the model output in chunks, try out the `basic_streaming_example.py` example. For streaming, only the GGUF backbones are currently supported. Ensure you have `llama-cpp-python`, `onnxruntime` and `pyaudio` installed to run this example. `pyaudio` needs the PortAudio library on macOS and Linux:
+
+```bash
+# macOS
+brew install portaudio && pip install pyaudio
+
+# Ubuntu/Debian
+sudo apt install portaudio19-dev && pip install pyaudio
+
+# Windows (prebuilt wheels)
+pip install pyaudio
+```
 
 ```bash
 python -m examples.basic_streaming_example \
