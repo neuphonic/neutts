@@ -4,13 +4,59 @@ import numpy as np
 from neutts import NeuTTS
 import pyaudio
 import time
+import queue
+import threading
 
 
 def _read_if_path(value: str) -> str:
     return open(value, "r", encoding="utf-8").read().strip() if os.path.exists(value) else value
 
 
-def main(input_text, ref_codes_path, ref_text, backbone):
+def audio_player_thread(audio_queue, stream, prefill_chunks=0):
+    # Increase prefill_chunks if RTF is slow to allow for smooth playback
+    PLAYBACK_CHUNK_BYTES = 2048
+    buffer = []
+
+    for _ in range(prefill_chunks):
+        chunk = audio_queue.get()
+        if chunk is None:
+            buffer.append(None)
+            break
+        buffer.append(chunk)
+
+    for chunk in buffer:
+        if chunk is None:
+            audio_queue.task_done()
+            return
+        for i in range(0, len(chunk), PLAYBACK_CHUNK_BYTES):
+            stream.write(chunk[i : i + PLAYBACK_CHUNK_BYTES], exception_on_underflow=False)
+        audio_queue.task_done()
+
+    while True:
+        audio_bytes = audio_queue.get()
+        if audio_bytes is None:
+            audio_queue.task_done()
+            break
+
+        for i in range(0, len(audio_bytes), PLAYBACK_CHUNK_BYTES):
+            slice_bytes = audio_bytes[i : i + PLAYBACK_CHUNK_BYTES]
+            stream.write(slice_bytes, exception_on_underflow=False)
+
+        audio_queue.task_done()
+
+
+def main(
+    input_text,
+    ref_codes_path,
+    ref_text,
+    backbone,
+    device,
+    codec,
+    codec_device,
+    seed,
+    temperature,
+    top_k,
+):
 
     assert backbone in [
         "neuphonic/neutts-air-q4-gguf",
@@ -28,9 +74,10 @@ def main(input_text, ref_codes_path, ref_text, backbone):
     # Initialize NeuTTS with the desired model and codec
     tts = NeuTTS(
         backbone_repo=backbone,
-        backbone_device="cpu",
-        codec_repo="neuphonic/neucodec-onnx-decoder",
-        codec_device="cpu",
+        backbone_device=device,
+        codec_repo=codec,
+        codec_device=codec_device,
+        seed=seed,
     )
 
     input_text = _read_if_path(input_text)
@@ -42,50 +89,58 @@ def main(input_text, ref_codes_path, ref_text, backbone):
 
     print(f"Generating audio for input text: {input_text}")
     p = pyaudio.PyAudio()
-    stream = p.open(
-        format=pyaudio.paInt16,
-        channels=1,
-        rate=tts.sample_rate,
-        output=True,
-        frames_per_buffer=int(tts.streaming_stride_samples),
-    )
+    stream = p.open(format=pyaudio.paInt16, channels=1, rate=tts.sample_rate, output=True)
+
+    audio_queue = queue.Queue()
+    player = threading.Thread(target=audio_player_thread, args=(audio_queue, stream))
+    player.start()
 
     total_audio_samples = 0
-    total_lm_time = 0.0
+    total_gen_time = 0.0
     chunk_count = 0
-    last_yield_time = None
     start_time = time.perf_counter()
+    last_yield_time = start_time
+
     print("Streaming...")
     print("-" * 80)
 
-    for chunk in tts.infer_stream(input_text, ref_codes, ref_text):
+    for chunk in tts.infer_stream(
+        input_text, ref_codes, ref_text, temperature=temperature, top_k=top_k
+    ):
         chunk_count += 1
         now = time.perf_counter()
-        lm_duration = None
-        if last_yield_time is not None:
-            lm_duration = now - last_yield_time
-            total_lm_time += lm_duration
+        gen_duration = now - last_yield_time
+        total_gen_time += gen_duration
         last_yield_time = now
+
         # Write audio
         audio = (chunk * 32767).astype(np.int16)
-        stream.write(audio.tobytes(), exception_on_underflow=False)
+        audio_queue.put(audio.tobytes())
         total_audio_samples += audio.shape[0]
+
         # Per-chunk timing log for latency info
         chunk_ms_actual = audio.shape[0] / tts.sample_rate * 1000
-        lm_ms = f"{lm_duration * 1000:6.1f}ms" if lm_duration is not None else "  n/a "
-        rt_percent = (
-            (lm_duration / (chunk_ms_actual / 1000) * 100) if lm_duration is not None else 0.0
-        )
-        print(
-            f"Chunk {chunk_count:2d}: "
-            f"LM={lm_ms} │ Audio={chunk_ms_actual:5.1f}ms │ {rt_percent:5.1f}% RT"
-        )
-    # Add a tail pad to avoid cutting off any final generation.
-    tail_pad = np.zeros(int(0.25 * tts.sample_rate), dtype=np.int16)
-    stream.write(tail_pad.tobytes(), exception_on_underflow=False)
-    time.sleep(0.05)
+        gen_ms = f"{gen_duration * 1000:6.1f}ms"
+        rt_percent = gen_duration / (chunk_ms_actual / 1000) * 100
+
+        if chunk_count == 1:
+            print(
+                f"Chunk {chunk_count:2d}: Generation Time={gen_ms} (TTFA) │ Chunk Size={chunk_ms_actual:5.1f}ms │ {rt_percent:5.1f}% RT"
+            )
+        else:
+            print(
+                f"Chunk {chunk_count:2d}: Generation Time={gen_ms}        │ Chunk Size={chunk_ms_actual:5.1f}ms │ {rt_percent:5.1f}% RT"
+            )
 
     total_time = time.perf_counter() - start_time
+
+    # Add a tail pad to avoid cutting off any final generation.
+    tail_pad = np.zeros(int(0.25 * tts.sample_rate), dtype=np.int16)
+    audio_queue.put(tail_pad.tobytes())
+
+    audio_queue.put(None)
+    player.join()
+
     total_audio_seconds = total_audio_samples / tts.sample_rate if total_audio_samples else 0.0
 
     # Print stats
@@ -95,7 +150,9 @@ def main(input_text, ref_codes_path, ref_text, backbone):
     )
 
     if chunk_count:
-        print(f"  → Average Speech LM time per chunk: {(total_lm_time / chunk_count) * 1000:.1f}ms")
+        print(
+            f"  → Average generation time per chunk: {(total_gen_time / chunk_count) * 1000:.1f}ms"
+        )
         if total_audio_seconds:
             rtf = total_time / total_audio_seconds
             print(f"  → Real-Time Factor (RTF): {rtf:.2f}")
@@ -128,16 +185,46 @@ if __name__ == "__main__":
         help="Reference text corresponding to the reference audio",
     )
     parser.add_argument(
-        "--output_path",
-        type=str,
-        default="output.wav",
-        help="Path to save the output audio",
-    )
-    parser.add_argument(
         "--backbone",
         type=str,
         default="neuphonic/neutts-nano-q8-gguf",
         help="Huggingface repo containing the backbone checkpoint. Must be GGUF.",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        help="Device for the backbone, e.g. cpu, mps, cuda",
+    )
+    parser.add_argument(
+        "--codec",
+        type=str,
+        default="neuphonic/neucodec-onnx-decoder",
+        help="Huggingface repo containing the codec checkpoint",
+    )
+    parser.add_argument(
+        "--codec_device",
+        type=str,
+        default="cpu",
+        help="Device for the codec, e.g. cpu, mps, cuda (onnx codecs are cpu only)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Optional seed for reproducible generation",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=1.0,
+        help="Sampling temperature",
+    )
+    parser.add_argument(
+        "--top_k",
+        type=int,
+        default=50,
+        help="Top-K sampling cutoff",
     )
     args = parser.parse_args()
     main(
@@ -145,4 +232,10 @@ if __name__ == "__main__":
         ref_codes_path=args.ref_codes,
         ref_text=args.ref_text,
         backbone=args.backbone,
+        device=args.device,
+        codec=args.codec,
+        codec_device=args.codec_device,
+        seed=args.seed,
+        temperature=args.temperature,
+        top_k=args.top_k,
     )

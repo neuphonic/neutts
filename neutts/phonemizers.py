@@ -158,5 +158,5 @@ class FrenchPhonemizer(BasePhonemizer):
 
 
 CUSTOM_PHONEMIZERS = {
-    "fr-fr": FrenchPhonemizer(),
+    "fr-fr": FrenchPhonemizer,
 }

@@ -32,12 +32,15 @@ This can be useful for running the model in resource-constrained environments wh
 To test the decoder, make sure you have installed ```onnxruntime``` and run the following:
 
 ```bash
-python -m examples.onnx_example \
+python -m examples.basic_example \
   --input_text "My name is Andy. I'm 25 and I just moved to London. The underground is pretty confusing, but it gets me around in no time at all." \
-  --ref_codes samples/jo.pt \
+  --ref_audio samples/jo.wav \
   --ref_text samples/jo.txt \
-  --backbone neuphonic/neutts-nano-q4-gguf
+  --backbone neuphonic/neutts-nano-q4-gguf \
+  --codec neuphonic/neucodec-onnx-decoder
 ```
+
+Since the onnx codec is decoder-only, this requires the pre-encoded reference (e.g. `samples/jo.pt`) to already exist alongside the wav.
 
 ### Streaming Support
 
@@ -49,4 +52,25 @@ python -m examples.basic_streaming_example \
   --ref_codes samples/jo.pt \
   --ref_text samples/jo.txt \
   --backbone neuphonic/neutts-nano-q4-gguf
+```
+
+### Emotional TTS (NeuTTS-2E)
+
+NeuTTS-2E uses fixed speakers with bundled pre-encoded references, so the emotional examples take a `--speaker` (`emily`, `paul`, `sophie`, `steven`) and an `--emotion` (`angry`, `disgusted`, `fearful`, `happy`, `neutral`, `sad`, `surprised`) instead of reference arguments:
+
+```bash
+python -m examples.basic_example_emotions \
+  --input_text "I can't believe it's finally here!" \
+  --speaker emily \
+  --emotion happy
+```
+
+Streaming (GGUF backbones, `neuphonic/neutts-2e-q8-gguf` by default):
+
+```bash
+python -m examples.basic_streaming_example_emotions \
+  --input_text "I can't believe it's finally here!" \
+  --speaker emily \
+  --emotion happy \
+  --backbone neuphonic/neutts-2e-q4-gguf
 ```

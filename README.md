@@ -11,7 +11,9 @@ HuggingFace 🤗:
    - NeuTTS-Nano-Spanish: [Model](https://huggingface.co/neuphonic/neutts-nano-spanish), [Q8 GGUF](https://huggingface.co/neuphonic/neutts-nano-spanish-q8-gguf), [Q4 GGUF](https://huggingface.co/neuphonic/neutts-nano-spanish-q4-gguf)
    - [Multilingual Space](https://huggingface.co/spaces/neuphonic/neutts-nano-multilingual-collection)
 
-[NeuTTS-Nano Demo Video](https://github.com/user-attachments/assets/629ec5b2-4818-4fa6-987a-99fcbadc56bc)
+- NeuTTS-2E (English, emotional control): [Model](https://huggingface.co/neuphonic/neutts-2e), [Q8 GGUF](https://huggingface.co/neuphonic/neutts-2e-q8-gguf), [Q4 GGUF](https://huggingface.co/neuphonic/neutts-2e-q4-gguf), [Space](https://huggingface.co/spaces/neuphonic/neutts-2e)
+
+[NeuTTS-2E Demo Video](https://github.com/user-attachments/assets/07bf3eaf-2ade-47c4-9d8e-82b583bfbd88)
 
 _Created by [Neuphonic](http://neuphonic.com/) - building faster, smaller, on-device voice AI_
 
@@ -42,12 +44,34 @@ NeuTTS models are built from small LLM backbones - lightweight yet capable langu
 - **Power Consumption**: Optimised for mobile and embedded devices
 
 
-|  | NeuTTS-Air | NeuTTS-Nano Models |
-|---|---:|---:|
-| **# Params (Active)** | ~360m | ~120m |
-| **# Params (Emb + Active)** | ~552m | ~229m |
-| **Cloning** | Yes | Yes |
-| **License** | Apache 2.0 | NeuTTS Open License 1.0 |
+|  | NeuTTS-Air | NeuTTS-Nano Models | NeuTTS-2E |
+|---|---:|---:|---:|
+| **# Params (Active)** | ~360m | ~120m | ~125m |
+| **# Params (Emb + Active)** | ~552m | ~229m | ~236m |
+| **Input Format** | Phonemes | Phonemes | Text |
+| **License** | Apache 2.0 | NeuTTS Open License 1.0 | NeuTTS Open License 1.0 |
+
+### Backbone Variants
+
+| Model | PyTorch repo | GGUF repos | Cloning | Emotions | Streaming |
+|---|---|---|---|---|---|
+| NeuTTS-Air | `neuphonic/neutts-air` | `neuphonic/neutts-air-{q4,q8}-gguf` | Yes | — | GGUF only |
+| NeuTTS-Nano | `neuphonic/neutts-nano` | `neuphonic/neutts-nano-{q4,q8}-gguf` | Yes | — | GGUF only |
+| NeuTTS-Nano German | `neuphonic/neutts-nano-german` | `neuphonic/neutts-nano-german-{q4,q8}-gguf` | Yes | — | GGUF only |
+| NeuTTS-Nano French | `neuphonic/neutts-nano-french` | `neuphonic/neutts-nano-french-{q4,q8}-gguf` | Yes | — | GGUF only |
+| NeuTTS-Nano Spanish | `neuphonic/neutts-nano-spanish` | `neuphonic/neutts-nano-spanish-{q4,q8}-gguf` | Yes | — | GGUF only |
+| NeuTTS-2E | `neuphonic/neutts-2e` | `neuphonic/neutts-2e-{q4,q8}-gguf` | 4 fixed speakers | 6 + neutral | GGUF only |
+
+### Codec Variants
+
+| Codec | Engine | Encode | Decode | GPU support |
+|---|---|---|---|---|
+| `neuphonic/neucodec` | PyTorch | Yes | Yes | Yes |
+| `neuphonic/distill-neucodec` | PyTorch | Yes | Yes | Yes |
+| `neuphonic/neucodec-onnx-decoder` | ONNX | — | Yes | — |
+| `neuphonic/neucodec-onnx-decoder-int8` | ONNX | — | Yes | — |
+
+Any backbone can be paired with any codec. Decoder-only (ONNX) codecs require pre-encoded references — these ship with the repo for all bundled voices, including the NeuTTS-2E speakers.
 
 ## Throughput Benchmarking
 
@@ -87,7 +111,7 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    pip install -e .
    ```
 
-   Alternatively to install all dependencies, including `onnxruntime` and `llama-cpp-python` (equivalent to steps 3 and 4 below):
+   Alternatively to install all dependencies, including `onnxruntime` and `llama-cpp-python` (equivalent to steps 2 and 3 below):
 
    ```bash
    pip install neutts[all]
@@ -160,7 +184,7 @@ python -m examples.basic_example \
   --ref_text samples/jo.txt
 ```
 
-To specify a particular model repo for the backbone or codec, add the `--backbone` argument. Available backbones are listed in [NeuTTS-Air](https://huggingface.co/collections/neuphonic/neutts-air) and [NeuTTS-Nano Multilingual Collection](https://huggingface.co/collections/neuphonic/neutts-nano-multilingual-collection) huggingface collections.
+To specify a particular model repo for the backbone or codec, add the `--backbone` and `--codec` arguments. Available backbones are listed in the [NeuTTS-Air](https://huggingface.co/collections/neuphonic/neutts-air), [NeuTTS-Nano Multilingual Collection](https://huggingface.co/collections/neuphonic/neutts-nano-multilingual-collection) and [NeuTTS-2E](https://huggingface.co/collections/neuphonic/neutts-2e) huggingface collections.
 
 > [!CAUTION]
 > If you are using a non-English backbone, it is highly recommended to use a same-language reference for best performance. See the 'example reference files' section below to select an appropriate example reference.
@@ -202,6 +226,34 @@ python -m examples.basic_streaming_example \
 
 Again, a particular model repo can be specified with the `--backbone` argument - note that for streaming the model must be in GGUF format.
 
+### Emotional TTS (NeuTTS-2E)
+
+NeuTTS-2E is a fixed-speaker emotional English model. Pre-encoded references for its four speakers (`emily`, `paul`, `sophie`, `steven`) live in `samples/` in the same format as every other reference, so no reference audio is needed — and they work as ordinary cloning references for the other models too. Supported emotions are `angry`, `disgusted`, `fearful`, `happy`, `neutral`, `sad` and `surprised`.
+
+```python
+from neutts import NeuTTS2E
+import soundfile as sf
+
+tts = NeuTTS2E()
+wav = tts.infer("I can't believe it's finally here!", speaker="emily", emotion="happy")
+sf.write("test.wav", wav, 24000)
+```
+
+Or from the command line:
+
+```bash
+python -m examples.basic_example_emotions \
+  --input_text "I can't believe it's finally here!" \
+  --speaker emily \
+  --emotion happy
+```
+
+Streaming works the same way via `examples.basic_streaming_example_emotions`, which uses the GGUF backbones (`neuphonic/neutts-2e-q8-gguf` by default, or `neuphonic/neutts-2e-q4-gguf` via `--backbone`).
+
+### Reproducibility
+
+Generation is sampled, and every call prints the seed it used. With no seed set, each call draws a fresh random seed, so repeated calls give different takes — to recover a take you liked, rerun with its printed seed. Passing `seed` to `NeuTTS`/`NeuTTS2E` (or `--seed` to the examples) pins it: the same inputs and seed always produce identical audio, on both the PyTorch and GGUF backbones, batch or streaming.
+
 ## Preparing References for Cloning
 
 NeuTTS requires two inputs:
@@ -218,6 +270,7 @@ You can find some ready-to-use references in the `samples` folder:
 - English:
    - `dave.wav`
    - `jo.wav`
+   - `emily.wav`, `paul.wav`, `sophie.wav`, `steven.wav` (the NeuTTS-2E speakers)
 - Spanish:
    - `mateo.wav`
 - German:

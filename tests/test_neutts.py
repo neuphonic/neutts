@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 from neutts import NeuTTS, BACKBONE_LANGUAGE_MAP
 
-
 _ALL_BACKBONES = list(BACKBONE_LANGUAGE_MAP.keys())
 _QUICK_BACKBONES = [
     "neuphonic/neutts-air",
@@ -107,3 +106,29 @@ def test_streaming_ggml_slow(backbone, codec, reference_data):
         pytest.skip("Skipping slow tests...")
     else:
         _run_streaming_test(backbone, codec, reference_data)
+
+
+def test_invalid_torch_device():
+    with pytest.raises(ValueError, match="valid and available torch device"):
+        NeuTTS(backbone_repo="neuphonic/neutts-air", backbone_device="gpu")
+    if not torch.cuda.is_available():
+        with pytest.raises(ValueError, match="valid and available torch device"):
+            NeuTTS(backbone_repo="neuphonic/neutts-air", backbone_device="cuda")
+
+
+def test_onnx_codec_requires_cpu(tmp_path):
+    with pytest.raises(ValueError, match="only currently run on CPU"):
+        NeuTTS(
+            backbone_repo="neuphonic/neutts-air-q4-gguf",
+            codec_repo="neuphonic/neucodec-onnx-decoder",
+            codec_device="mps",
+        )
+
+    onnx_path = tmp_path / "model.onnx"
+    onnx_path.touch()
+    with pytest.raises(ValueError, match="only currently run on CPU"):
+        NeuTTS(
+            backbone_repo="neuphonic/neutts-air-q4-gguf",
+            codec_repo=str(onnx_path),
+            codec_device="mps",
+        )

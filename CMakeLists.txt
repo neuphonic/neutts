@@ -52,3 +52,12 @@ endif()
 install(DIRECTORY ${ESPEAKNG_INSTALL_DIR}/share/espeak-ng-data/
     DESTINATION neutts/espeak-ng-data
 )
+
+# Bundle the NeuTTS-2E speaker references so NeuTTS2E works from an installed wheel
+foreach(speaker emily paul sophie steven)
+    install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/samples/${speaker}.pt
+        ${CMAKE_CURRENT_SOURCE_DIR}/samples/${speaker}.txt
+        DESTINATION neutts/samples
+    )
+endforeach()

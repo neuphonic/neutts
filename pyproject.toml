@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "neutts"
-version = "1.2.1"
+version = "1.4.1"
 authors = [
   { name="neuphonic", email="general@neuphonic.com" },
 ]
@@ -14,19 +14,20 @@ requires-python = ">=3.10, <3.14"
 dependencies = [
     "librosa==0.11.0",
     "neucodec>=0.0.4",
-    "numpy~=2.2.6",
+    "numpy>=2.2.6",
     "phonemizer>=3.0.0",
     "resemble-perth==1.0.1",
     "soundfile==0.13.1",
     "torch>=2.8.0",
-    "transformers~=4.56.1",
+    "torchaudio>=2.8.0",
+    "transformers==5.1.0",
 ]
 
 # Defining optional installations
 [project.optional-dependencies]
-llama = ["llama-cpp-python"]
+llama = ["llama-cpp-python", "gguf"]
 onnx = ["onnxruntime"]
-all = ["llama-cpp-python", "onnxruntime"]
+all = ["llama-cpp-python", "gguf", "onnxruntime"]
 
 [tool.scikit-build]
 # Include the espeak-ng-data directory that cmake copies into the package
