@@ -11,7 +11,13 @@ You can prepare your own dataset by following these steps:
 
 1. Encode your audio files using the [NeuCodec](https://huggingface.co/neuphonic/neucodec) model into a format similar to the [Emilia-YODAS dataset](https://huggingface.co/datasets/neuphonic/emilia-yodas-english-neucodec).
 2. Setup your configuration file similar to the [example config](/examples/finetune_config.yaml).
-3. Check and modify the phonemizer and the tokenizer in the script such that they suit your dataset/task. See [the phonemizer documentation](https://bootphon.github.io/phonemizer/api_reference.html#phonemizer.backend.espeak.espeak.EspeakBackend) for phonemizer arguments.
+3. Phonemize your text once before training so your dataset has a `phones` column. For a Hugging Face dataset, run:
+
+    ```bash
+    python examples/phonemize_dataset.py DATASET_NAME ./phonemized_dataset --language en-us
+    ```
+
+    Replace `DATASET_NAME`, the output path, and `--language` with values for your dataset. Use `python examples/phonemize_dataset.py parquet ./phonemized_dataset --data_files path/to/data.parquet --language en-us` for local parquet files. See [the phonemizer documentation](https://bootphon.github.io/phonemizer/api_reference.html#phonemizer.backend.espeak.espeak.EspeakBackend) for supported eSpeak language codes.
 4. Run the finetuning script with your dataset and configuration file. To do this, navigate to the base directory of your cloned repo in the terminal and run:
 
     ```bash
@@ -20,10 +26,14 @@ You can prepare your own dataset by following these steps:
 
     replacing the argument with the path to your own config file if needed.
 
+The finetuning script reads `phones` directly when the column is present. Datasets without `phones` still work through inline phonemization for compatibility, but preprocessing first is recommended.
+
 # Finetuning config
 
 An example finetuning config lives in `examples/finetune_config.yaml`.
 
+- Set `dataset_name`, `dataset_split`, and `dataset_from_disk` to point at your training dataset. For the local output above, use `dataset_name: "./phonemized_dataset"` and `dataset_from_disk: true`.
+- Set `language` to the eSpeak language code that matches your dataset, for example `en-us`, `de`, `fr-fr`, or `es`.
 - In the past we've found a learning rate of `1e-5` to `4e-5` to have worked well for finetuning depending on the size of the dataset.
 - We generally find that you do not need many steps for finetuning. For example, for a dataset of 10 hours, 1000 to 2000 steps is often sufficient.
 - A warmup ratio as well as different learning rate schedulers can be experimented with to see what works best for your dataset.
