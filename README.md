@@ -102,6 +102,9 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
 > We have added a [streaming example](examples/basic_streaming_example.py) using the `llama-cpp-python` library as well as a [finetuning script](examples/finetune.py). For finetuning, please refer to the [finetune guide](TRAINING.md) for more details.
 
 1. **Install NeuTTS**
+
+   - Python 3.10-3.14 is supported. On Python 3.14, `llama-cpp-python` may need to build from source.
+
    ```bash
    pip install neutts
    ```
