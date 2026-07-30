@@ -9,6 +9,7 @@ def main(
     ref_audio_path,
     ref_text,
     backbone,
+<<<<<<< HEAD
     device,
     codec,
     codec_device,
@@ -16,6 +17,11 @@ def main(
     temperature,
     top_k,
     output_path="output.wav",
+=======
+    output_path="output.wav",
+    backbone_device="auto",
+    codec_device="auto",
+>>>>>>> ad81e78 (Enhance benchmarking capabilities and device selection in examples)
 ):
     if not ref_audio_path or not ref_text:
         print("No reference audio or text provided.")
@@ -24,10 +30,21 @@ def main(
     # Initialize NeuTTS with the desired model and codec
     tts = NeuTTS(
         backbone_repo=backbone,
+<<<<<<< HEAD
+<<<<<<< HEAD
         backbone_device=device,
         codec_repo=codec,
         codec_device=codec_device,
         seed=seed,
+=======
+        codec_repo="neuphonic/neucodec",
+        codec_device="auto"
+>>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
+=======
+        backbone_device=backbone_device,
+        codec_repo="neuphonic/neucodec",
+        codec_device=codec_device,
+>>>>>>> ad81e78 (Enhance benchmarking capabilities and device selection in examples)
     )
 
     # Check if ref_text is a path if it is read it if not just return string
@@ -118,6 +135,18 @@ if __name__ == "__main__":
         default=50,
         help="Top-K sampling cutoff",
     )
+    parser.add_argument(
+        "--backbone_device",
+        type=str,
+        default="auto",
+        help="Device placement for the backbone (auto, cpu, cuda, gpu, mps)",
+    )
+    parser.add_argument(
+        "--codec_device",
+        type=str,
+        default="auto",
+        help="Device placement for the NeuCodec decoder (auto, cpu, cuda, ...)",
+    )
     args = parser.parse_args()
     main(
         input_text=args.input_text,
@@ -131,4 +160,6 @@ if __name__ == "__main__":
         temperature=args.temperature,
         top_k=args.top_k,
         output_path=args.output_path,
+        backbone_device=args.backbone_device,
+        codec_device=args.codec_device,
     )

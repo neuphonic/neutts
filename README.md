@@ -27,7 +27,7 @@ State-of-the-art Voice AI has been locked behind web APIs for too long. NeuTTS i
 - 🚄Simple LM + codec architecture - making development and deployment simple
 
 > [!CAUTION]
-> Websites like neutts.com are popping up and they're not affliated with Neuphonic, our github or this repo.
+> Websites like neutts.com are popping up and they're not affiliated with Neuphonic, our github or this repo.
 >
 > We are on neuphonic.com only. Please be careful out there! 🙏
 
@@ -158,9 +158,40 @@ We include benchmarks on four devices: Galaxy A25 5G, AMD Ryzen 9HX 370, iMac M4
    #### Looking for GPU Support?
    If you have a dedicated GPU (Nvidia/CUDA, AMD/ROCm, M-Series Mac/Metal) and want to utilize it instead of the CPU, the CMAKE flags will be different.Please refer to the official [llama-cpp-python documentation](https://github.com/abetlen/llama-cpp-python/blob/main/README.md) for the exact flags required for your specific hardware.
 
+<<<<<<< HEAD
 3. **(Optional) Install `onnxruntime` to use the `.onnx` decoder.**
    ```bash
    pip install "neutts[onnx]"
+=======
+   The requirements file includes the dependencies needed to run the model with PyTorch.
+   When using an ONNX decoder or a GGML model, some dependencies (such as PyTorch) are no longer required.
+
+   The inference is compatible and tested on `python>=3.11`.
+
+    ```
+    pip install -r requirements.txt
+    ```
+
+4. **(Optional) Install Llama-cpp-python to use the `GGUF` models.**
+   ```
+   pip install llama-cpp-python
+   ```
+   To run llama-cpp with GPU suport (CUDA, MPS) support please refer to:
+   https://pypi.org/project/llama-cpp-python/
+
+5. **(Optional) Install ONNX Runtime to use the `.onnx` decoder.**
+   Choose the build that matches the execution provider you want to use:
+
+   ```bash
+   # CPU-only runtime
+   pip install onnxruntime
+
+   # CUDA-enabled runtime (NVIDIA GPUs)
+   pip install onnxruntime-gpu
+
+   # DirectML runtime (Windows GPUs)
+   pip install onnxruntime-directml
+>>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
    ```
 
 ## Examples
@@ -189,17 +220,34 @@ To specify a particular model repo for the backbone or codec, add the `--backbon
 > [!CAUTION]
 > If you are using a non-English backbone, it is highly recommended to use a same-language reference for best performance. See the 'example reference files' section below to select an appropriate example reference.
 
+### Device / Execution Provider Logic
+---------------------------------
+
+The same ONNX Runtime provider–selection logic used by the benchmarking tools is applied during normal inference and streaming via `neuttsair/neutts.py`.
+
+- The system detects available ONNX providers (examples: `CUDAExecutionProvider`, `ROCMExecutionProvider`, `DmlExecutionProvider`, `MetalExecutionProvider`, `CoreMLExecutionProvider`).
+- If a GPU/back-end provider is available it will be preferred; otherwise the runtime falls back to `CPUExecutionProvider`.
+- On Apple Silicon (M1/M2/M3) the default PyPI `onnxruntime` wheel may not expose Metal/CoreML providers. If no native macOS provider is present the codec will run on CPU — install a native macOS ONNX package (see `examples/README.md`) to enable `MetalExecutionProvider`/`CoreMLExecutionProvider`.
+- You can override automatic selection by passing `backbone_device` (for the backbone) or `codec_device` (for the decoder) to force `cpu` or a specific provider identifier (for example `--codec_device metal` or `--codec_device cuda:0`).
+
+
+
 ### One-Code Block Usage
 
 ```python
 from neutts import NeuTTS
 import soundfile as sf
 
+<<<<<<< HEAD
 tts = NeuTTS(
    backbone_repo="neuphonic/neutts-nano", # or 'neuphonic/neutts-nano-q4-gguf' with llama-cpp-python installed
    backbone_device="cpu",
+=======
+tts = NeuTTSAir(
+   backbone_repo="neuphonic/neutts-air", # or 'neutts-air-q4-gguf' with llama-cpp-python installed
+>>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
    codec_repo="neuphonic/neucodec",
-   codec_device="cpu"
+   codec_device="auto"  # 'auto', 'cpu', 'cuda', 'cuda:0', 'directml', 'rocm', ...
 )
 input_text = "My name is Andy. I'm 25 and I just moved to London. The underground is pretty confusing, but it gets me around in no time at all."
 
@@ -213,6 +261,7 @@ wav = tts.infer(input_text, ref_codes, ref_text)
 sf.write("test.wav", wav, 24000)
 ```
 
+<<<<<<< HEAD
 ### Streaming
 
 Speech can also be synthesised in _streaming mode_, where audio is generated in chunks and plays as generated. The streaming example scripts use `pyaudio` for playback, which needs the PortAudio library on macOS and Linux:
@@ -266,6 +315,63 @@ Streaming works the same way via `examples.basic_streaming_example_emotions`, wh
 ### Reproducibility
 
 Generation is sampled, and every call prints the seed it used. With no seed set, each call draws a fresh random seed, so repeated calls give different takes — to recover a take you liked, rerun with its printed seed. Passing `seed` to `NeuTTS`/`NeuTTS2E` (or `--seed` to the examples) pins it: the same inputs and seed always produce identical audio, on both the PyTorch and GGUF backbones, batch or streaming.
+=======
+`backbone_device` now defaults to `"auto"`, which prefers CUDA (or Apple MPS) when available and falls back to CPU otherwise. Override it manually if you need to pin the backbone to a specific device (e.g. `"cpu"` or `"cuda:1"`).
+
+`codec_device` follows similar rules for the ONNX decoder:
+
+- omit the argument or set `"auto"` to choose the first available GPU execution provider and transparently fall back to CPU if none are detected;
+- set `"cuda"`, `"cuda:<index>"`, `"directml"`, or `"rocm"` to prefer that GPU provider while still falling back to CPU when the provider is missing;
+- set `"cpu"` to keep the decoder on the CPU exclusively.
+>>>>>>> 98ebc11 (Add ONNX decoder GPU support with CPU fallback)
+
+## Benchmarking ONNX providers
+
+You can profile the available ONNX Runtime execution providers with the benchmarking helper:
+
+```bash
+python -m examples.provider_benchmark \
+   --input_text "Benchmarking NeuTTS Air" \
+   --ref_codes samples/dave.pt \
+   --ref_text samples/dave.txt \
+   --runs 3 \
+   --output benchmark_results.json
+```
+
+The script automatically discovers reachable providers (CUDA, ROCm, DirectML and CPU), synthesises speech for each, and reports:
+
+- model load time, inference time, and total wall-clock time;
+- real-time factor (RTF = inference time ÷ audio duration);
+- host RAM deltas and CUDA VRAM peaks (when applicable);
+- the concrete provider order applied by ONNX Runtime.
+
+Raw run data and aggregated statistics are saved to JSON when `--output` is provided. Use `--verbose` to see per-run metrics in the console. Add `--summary_output benchmark.txt` to persist the rendered table and detected system hardware in plain text.
+
+Models are now instantiated once per device during benchmarking and reused for the measured runs. A single warm-up pass is executed by default before timings are recorded; customise this with `--warmup_runs`, or opt back into the legacy behaviour (fresh load per run) with `--no_reuse`.
+
+The console output includes your system metadata above the table so you can attribute results to a specific machine.
+
+The column values are reported as `mean ± standard deviation` across the configured runs.
+
+Note for macOS / Apple Silicon users: On M1/M2/M3 machines the ONNX decoder will automatically use the CPU if no Metal/CoreML execution providers are available; install a native macOS ONNX package (see `examples/README.md`) to enable `MetalExecutionProvider`/`CoreMLExecutionProvider` and request them with `--codec_device metal` or `--codec_device coreml`.
+
+Pass `--backbone_devices cpu,cuda` (or any comma-separated list) to benchmark the cross-product of backbone and codec execution targets—the resulting table reports both placements per row. You can also provide multiple repositories at once. For example, to compare the torch checkpoint with both GGUF variants (Q4 and Q8) across CPU/CUDA combinations:
+
+```bash
+python -m examples.provider_benchmark \
+   --input_text "Benchmarking NeuTTS Air combos" \
+   --ref_codes samples/dave.pt \
+   --ref_text samples/dave.txt \
+   --backbone_repos neuphonic/neutts-air,neuphonic/neutts-air-q4-gguf,neuphonic/neutts-air-q8-gguf \
+   --backbone_devices cpu,cuda \
+   --codec_devices cpu,cuda \
+   --runs 3 \
+   --warmup_runs 1 \
+   --output gguf_comparison.json \
+   --summary_output gguf_comparison.txt
+```
+
+Add `--codec_repos` if you want to include custom decoder builds alongside `neucodec-onnx-decoder` in the same sweep.
 
 ## Preparing References for Cloning
 

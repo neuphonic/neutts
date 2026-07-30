@@ -1,12 +1,11 @@
-# MacOS
-**.DS_Store
-
-# Emacs
-*~
+# OS-generated files
+.DS_Store
+**/.DS_Store
+Thumbs.db
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[codz]
+*.py[cod]
 *$py.class
 
 # C extensions
@@ -19,6 +18,151 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff
+instance/
+.webassets-cache
+
+# Scrapy stuff
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Package managers
+.pdm-python
+.pdm-build/
+.pixi
+__pypackages__/
+
+# IDE / Editor
+.idea/
+.vscode/
+.spyderproject
+.spyproject
+.ropeproject
+.cursorignore
+.cursorindexingignore
+.ruff_cache/
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+
+# Generated audio & benchmark artifacts
+output.wav
+output_*.wav
+artifacts/
+!artifacts/.gitkeep
+!artifacts/audio/.gitkeep
+!artifacts/benchmarks/.gitkeep
+
+benchmark_results.json
+benchmark_summary.txt
+gguf_benchmark.json
+gguf_benchmark.txt
+gguf_comparison.json
+gguf_comparison.txt
+benchmark_results_*.json
+benchmark_results_*.txt
+
+# Misc local results
+results.json
+results.txt
+cuda-results.json
+cuda-results.txt# MacOS
+**.DS_Store
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+
+# Generated audio and benchmark artifacts
+output.wav
+output_*.wav
+benchmark_results.json
+benchmark_summary.txt
+gguf_benchmark.json
+gguf_benchmark.txt
+gguf_comparison.json
+gguf_comparison.txt
 .eggs/
 lib/
 lib64/
@@ -211,3 +355,29 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+# Local test outputs
+output.wav
+output_onnx.wav
+output_onnx_gpu.wav
+benchmark_results.json
+benchmark_summary.txt
+output_gguf.wav
+gguf_benchmark.json
+gguf_benchmark.txt
+gguf_comparison.json
+gguf_comparison.txt
+benchmark_results_*.json
+benchmark_results_*.txt
+cuda-results.json
+cuda-results.txt
+results.json
+results.txt
+
+integration_sdk/
+integration_sdk/**
+**/integration_sdk/
+
+samples/
+samples/**
